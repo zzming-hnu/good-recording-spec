@@ -29,9 +29,37 @@
 
 ## Constitution Check
 
-*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.
+Source of truth: `.specify/memory/constitution.md` (current version 1.0.0).*
 
-[Gates determined based on constitution file]
+For each gate, mark PASS / FAIL / N/A and link to the spec / design section
+that justifies the answer. Any FAIL MUST be either resolved before continuing
+or recorded in the "Complexity Tracking" table below with a rejected simpler
+alternative.
+
+- [ ] **I. 本地优先与隐私保护 (NON-NEGOTIABLE)**: All user data stays on
+      device. Any network call has explicit UI disclosure, an offline fallback,
+      and is auditable in local logs. Telemetry defaults OFF.
+- [ ] **II. 普通用户为中心的简洁体验**: Main path ≤ 3 steps; copy uses
+      everyday language (no `JSON`/`path`/`endpoint` leaking to users); every
+      reversible action is undoable; every irreversible action has a confirm
+      dialog with consequences spelled out.
+- [ ] **III. 独立可测与渐进交付 (NON-NEGOTIABLE)**: Each user story has its
+      own automated unit + acceptance test, ships behind a flag / module
+      boundary, and is deliverable as MVP → gradual rollout → GA with explicit
+      exit criteria per stage.
+- [ ] **IV. macOS 原生与平台一致性**: App passes Sandbox + Hardened Runtime
+      + Notarization; UI follows Apple HIG (menu bar, shortcuts, dark mode,
+      VoiceOver); ships Universal Binary; minimum macOS version recorded and
+      within "current − 2 majors".
+- [ ] **V. 本地可观测与可恢复**: Critical operations emit structured local
+      logs (user-visible, exportable, clearable); user data is exportable in
+      a plain-text format; destructive changes auto-snapshot; crash reports
+      are local-first.
+- [ ] **macOS Platform Constraints**: Cold start ≤ 2.0s, idle RSS ≤ 200 MB,
+      interaction ≤ 100 ms p95 on Apple Silicon; data stored only in
+      sandboxed `Application Support` / user-selected paths; CI builds &
+      tests both arm64 and x86_64.
 
 ## Project Structure
 
