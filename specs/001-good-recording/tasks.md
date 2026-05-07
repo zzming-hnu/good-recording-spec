@@ -44,20 +44,28 @@ independently completable; the only hard ordering is Setup → Foundational
 settings, entitlements, scripts. After this phase the project compiles
 and produces an empty `.app` bundle that passes Sandbox + signing.
 
-- [ ] T001 Create monorepo skeleton: `apps/good-recording/`, `scripts/`, `scripts/ci/` directories at repo root
-- [ ] T002 Initialize Xcode project at `apps/good-recording/GoodRecording.xcodeproj` with one app target (`GoodRecording`) and three test targets (`UnitTests`, `IntegrationTests`, `UITests`)
-- [ ] T003 Configure project build settings: `MACOSX_DEPLOYMENT_TARGET = 15.0`, `SWIFT_VERSION = 6.0`, `ARCHS = arm64 x86_64`, `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = YES` in `apps/good-recording/GoodRecording.xcodeproj/project.pbxproj`
-- [ ] T004 Create `apps/good-recording/Resources/GoodRecording.entitlements` with the exact 6 entitlement keys listed in `contracts/permissions.md` (sandbox + audio-input + movies/music + user-selected files + bookmarks)
-- [ ] T005 [P] Populate `apps/good-recording/Resources/Info.plist` with bundle id `com.zzming.good-recording`, `LSApplicationCategoryType = public.app-category.video`, and the three `NSUsageDescription` strings exactly as in `contracts/permissions.md`
-- [ ] T006 [P] Create `apps/good-recording/Resources/Localizable.xcstrings` with `zh-Hans` (primary) and `en` (fallback) locales; seed with empty key list (per-feature tasks add keys)
-- [ ] T007 [P] Create `apps/good-recording/Resources/Assets.xcassets` with placeholder app icon and accent color
-- [ ] T008 [P] Create `scripts/build-universal.sh` (xcodebuild archive → exportArchive → lipo verify) per `quickstart.md` §3
-- [ ] T009 [P] Create `scripts/sign-and-notarize.sh` (codesign → notarytool submit → stapler) per `quickstart.md` §3
-- [ ] T010 [P] Create CI lint scripts under `scripts/ci/`: `check-entitlements.sh` (forbidden key list per `contracts/permissions.md`), `check-no-network.sh` (nettop assertion per Constitution I / SC-006), `check-strings.sh` (forbidden tech words in Localizable per Constitution II), `check-logs-contract.sh` (validates JSON Lines schema per `contracts/logs.md`)
-- [ ] T011 [P] Create `apps/good-recording/Sources/App/FeatureFlags.swift` with the 5 boolean flags `US1_RECORDING ... US5_AUDIO_ONLY_MODE` per `quickstart.md` §2
-- [ ] T012 [P] Create `scripts/ci/xc-dependency-lint.sh` Run Phase script that fails the build if any `Sources/Features/US{N}-*` module imports any other Feature module (enforces independent-test boundary per Constitution III)
+> **Implementation note (2026-05-07)**: Phase 1 was executed in the sibling
+> repository `~/project/good-recording/` (NOT under `apps/` in this repo) per
+> the user's choice during /speckit-implement. File paths referenced in T001–
+> T012 below have been resolved to that sibling repo's root (drop the leading
+> `apps/good-recording/`). All subsequent phases (T013 onward) should land in
+> the same sibling repo. See its commit `c018162 [Spec Kit] Phase 1 Setup
+> skeleton (T001–T012)` for the materialized scaffold.
 
-**Checkpoint**: `xcodebuild -scheme GoodRecording build` succeeds; `./scripts/ci/check-entitlements.sh` passes; `lipo -info` reports both arm64 + x86_64.
+- [X] T001 Create monorepo skeleton: `apps/good-recording/`, `scripts/`, `scripts/ci/` directories at repo root *(executed as repo-root layout in sibling repo: `Sources/`, `Resources/`, `Tests/`, `scripts/`, `scripts/ci/`)*
+- [X] T002 Initialize Xcode project at `apps/good-recording/GoodRecording.xcodeproj` with one app target (`GoodRecording`) and three test targets (`UnitTests`, `IntegrationTests`, `UITests`) *(materialized via XcodeGen `project.yml`; .xcodeproj is gitignored and reproducible by `xcodegen generate`)*
+- [X] T003 Configure project build settings: `MACOSX_DEPLOYMENT_TARGET = 15.0`, `SWIFT_VERSION = 6.0`, `ARCHS = arm64 x86_64`, `ENABLE_HARDENED_RUNTIME = YES`, `ENABLE_APP_SANDBOX = YES` in `apps/good-recording/GoodRecording.xcodeproj/project.pbxproj` *(captured in `project.yml` `settings.base`, plus strict concurrency + warnings-as-errors)*
+- [X] T004 Create `apps/good-recording/Resources/GoodRecording.entitlements` with the exact 6 entitlement keys listed in `contracts/permissions.md` (sandbox + audio-input + movies/music + user-selected files + bookmarks)
+- [X] T005 [P] Populate `apps/good-recording/Resources/Info.plist` with bundle id `com.zzming.good-recording`, `LSApplicationCategoryType = public.app-category.video`, and the three `NSUsageDescription` strings exactly as in `contracts/permissions.md`
+- [X] T006 [P] Create `apps/good-recording/Resources/Localizable.xcstrings` with `zh-Hans` (primary) and `en` (fallback) locales; seed with empty key list (per-feature tasks add keys) *(seeded with `App.Title` + `App.Subtitle` for the bootstrap window)*
+- [X] T007 [P] Create `apps/good-recording/Resources/Assets.xcassets` with placeholder app icon and accent color
+- [X] T008 [P] Create `scripts/build-universal.sh` (xcodebuild archive → exportArchive → lipo verify) per `quickstart.md` §3
+- [X] T009 [P] Create `scripts/sign-and-notarize.sh` (codesign → notarytool submit → stapler) per `quickstart.md` §3
+- [X] T010 [P] Create CI lint scripts under `scripts/ci/`: `check-entitlements.sh` (forbidden key list per `contracts/permissions.md`), `check-no-network.sh` (nettop assertion per Constitution I / SC-006), `check-strings.sh` (forbidden tech words in Localizable per Constitution II), `check-logs-contract.sh` (validates JSON Lines schema per `contracts/logs.md`) *(check-no-network.sh and check-logs-contract.sh ship as documented stubs that exit-zero; full implementations land in T114 and alongside T016 respectively)*
+- [X] T011 [P] Create `apps/good-recording/Sources/App/FeatureFlags.swift` with the 5 boolean flags `US1_RECORDING ... US5_AUDIO_ONLY_MODE` per `quickstart.md` §2
+- [X] T012 [P] Create `scripts/ci/xc-dependency-lint.sh` Run Phase script that fails the build if any `Sources/Features/US{N}-*` module imports any other Feature module (enforces independent-test boundary per Constitution III)
+
+**Checkpoint**: `xcodebuild -scheme GoodRecording build` succeeds; `./scripts/ci/check-entitlements.sh` passes; `lipo -info` reports both arm64 + x86_64. *(2026-05-07 status: lint scripts pass locally; xcodebuild verification pending — needs full Xcode in the dev environment, run `xcodegen generate && xcodebuild build` after cloning the sibling repo.)*
 
 ---
 
