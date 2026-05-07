@@ -1,0 +1,42 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "App.Title" : {
+      "comment" : "App display name shown in the title bar / About window.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good Recording"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Good Recording"
+          }
+        }
+      }
+    },
+    "App.Subtitle" : {
+      "comment" : "Subtitle shown in the empty MainWindow placeholder before US1 lands.",
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "Local-first screen + audio recording"
+          }
+        },
+        "zh-Hans" : {
+          "stringUnit" : {
+            "state" : "translated",
+            "value" : "本地优先的屏幕与音频录制"
+          }
+        }
+      }
+    }
+  },
+  "version" : "1.0"
+}
