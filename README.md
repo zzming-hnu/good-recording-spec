@@ -35,8 +35,28 @@ modules, Features US1–US5, Polish) populate `Sources/Core/*` and
 | Tool | Version | Why |
 |---|---|---|
 | macOS | 15.0+ | Min deployment target |
-| Xcode | 16.0+ | Swift 6 toolchain |
+| **Full Xcode** (NOT Command Line Tools) | 16.0+ | Swift 6 toolchain + `xcodebuild` + `notarytool` + `stapler`. CLT alone is **insufficient** — `xcodebuild` requires the full app. |
 | [XcodeGen](https://github.com/yonaskolb/XcodeGen) | latest | Materializes `GoodRecording.xcodeproj` from `project.yml`. Install: `brew install xcodegen` |
+
+### Xcode setup checklist
+
+```bash
+# 1. Confirm where xcode-select currently points
+xcode-select -p
+# If it returns /Library/Developer/CommandLineTools you DO NOT have full Xcode.
+
+# 2. Install full Xcode from App Store (recommended) or
+#    https://developer.apple.com/download/all/
+
+# 3. Switch the active developer directory
+sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+
+# 4. Accept the license
+sudo xcodebuild -license accept
+
+# 5. Verify
+xcodebuild -version    # should print Xcode 16.x
+```
 
 ## Build / Run
 

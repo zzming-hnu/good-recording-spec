@@ -19,6 +19,19 @@ set -euo pipefail
 APP_PATH="${1:-build/Release/GoodRecording.app}"
 PROFILE="${NOTARYTOOL_PROFILE:-good-recording-notary}"
 
+# Pre-flight: full Xcode required for notarytool / stapler to work end-to-end.
+DEV_DIR="$(xcode-select -p 2>/dev/null || echo '<not set>')"
+if [[ "$DEV_DIR" != *"Xcode.app"* ]]; then
+    echo "" >&2
+    echo "❌ 没有检测到完整的 Xcode (当前 xcode-select 指向: $DEV_DIR)" >&2
+    echo "" >&2
+    echo "   原因: notarytool / stapler 都随完整的 Xcode 分发, CLT 不带。" >&2
+    echo "" >&2
+    echo "   下一步: 见 scripts/build-universal.sh 的安装指引。" >&2
+    echo "" >&2
+    exit 1
+fi
+
 if [[ ! -d "$APP_PATH" ]]; then
     echo "❌ App bundle not found at $APP_PATH" >&2
     echo "   Run scripts/build-universal.sh first." >&2
