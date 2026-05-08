@@ -1,22 +1,35 @@
-// good-recording — Core/Encoding/AudioMixer.swift (T025)
+// good-recording — Core/Encoding/AudioMixer.swift (v0.2)
 //
-// Mix mic + system-audio CMSampleBuffers into a single AAC track output.
+// True two-source audio mixing via AVAudioEngine. Replaces the v0.1
+// byte-level PCM hack that produced "电音" distortion when both mic
+// and system audio were enabled.
 //
-// Approach:
-//   - System audio (from SCK) and mic audio (from AVCaptureSession) arrive
-//     asynchronously with different sample rates (we normalize via AVAudioConverter).
-//   - We hold both in small ring buffers, align by host timestamp, and emit
-//     a mixed sample buffer into the AssetWriterPipeline's audio input.
-//   - When only one source is enabled, we pass it straight through (no mix).
+// Pipeline:
 //
-// v1 implementation favors correctness over CPU efficiency: it uses
-// AVAudioPCMBuffer + manual sample-by-sample mixing in Float32.
+//   acceptSystem(CMSampleBuffer)
+//     → CMSampleBuffer → AVAudioPCMBuffer (per-source format)
+//     → AVAudioConverter → AVAudioPCMBuffer (standardFormat)
+//     → sysPlayer.scheduleBuffer
 //
-// Source of truth: home-spec/specs/001-good-recording/research.md R2
+//   acceptMic(CMSampleBuffer)
+//     → ditto but via micConverter into micPlayer
+//
+//   AVAudioEngine.mainMixerNode mixes both nodes
+//     → installTap(format: standardFormat)
+//     → tap CB → AVAudioPCMBuffer
+//     → CMSampleBuffer (with synthetic monotonically-increasing PTS)
+//     → output?(CMSampleBuffer) → AssetWriterPipeline
+//
+// Single-source modes (only mic OR only system) still bypass the
+// engine entirely with bit-exact pass-through.
+//
+// Source of truth: home-spec/specs/001-good-recording/research.md R2 +
+// spec.md FR-011 (mix sources into single track).
 
 import Foundation
-import AVFoundation
-import CoreMedia
+@preconcurrency import AVFoundation
+@preconcurrency import CoreMedia
+@preconcurrency import AudioToolbox
 
 public actor AudioMixer {
 
@@ -29,17 +42,46 @@ public actor AudioMixer {
             self.micEnabled = micEnabled
             self.systemEnabled = systemEnabled
         }
+        public var bothEnabled: Bool { micEnabled && systemEnabled }
     }
 
     private let config: Config
 
-    /// 当前对外发布混合好的 sample buffer 的 callback。
+    /// Sink for the mixed sample buffers (set by CaptureCoordinator).
     private var output: (@Sendable (CMSampleBuffer) -> Void)?
 
-    // Tiny per-source buffers (newest sample wins; we don't try to perfectly
-    // align timestamps — just concurrent-ish playback in the output AAC).
-    private var pendingSystem: CMSampleBuffer?
-    private var pendingMic:    CMSampleBuffer?
+    // MARK: AVAudioEngine plumbing
+
+    private let engine = AVAudioEngine()
+    private let micPlayer = AVAudioPlayerNode()
+    private let sysPlayer = AVAudioPlayerNode()
+
+    /// Common format every source is converted to before reaching the
+    /// mixer. 48 kHz Float32 stereo non-interleaved matches AVAssetWriter's
+    /// preferred input for AAC encoding and what SCK produces natively.
+    private let standardFormat: AVAudioFormat = {
+        AVAudioFormat(
+            commonFormat: .pcmFormatFloat32,
+            sampleRate: AudioFormat.sampleRate,
+            channels: AVAudioChannelCount(AudioFormat.channels),
+            interleaved: false
+        )!
+    }()
+
+    private var sysConverter: AVAudioConverter?
+    private var micConverter: AVAudioConverter?
+    private var sysSourceFormat: AVAudioFormat?
+    private var micSourceFormat: AVAudioFormat?
+
+    private var engineStarted = false
+    private var engineStartFailed = false
+
+    /// Synthetic PTS state — tap output has no original timestamps so we
+    /// derive monotonic ones from cumulative frame count.
+    private var ptsBase: CMTime?
+    private var ptsCumulativeFrames: Int64 = 0
+
+    // MARK: Init
 
     public init(config: Config) {
         self.config = config
@@ -49,180 +91,351 @@ public actor AudioMixer {
         self.output = cb
     }
 
+    // MARK: Engine lifecycle
+
+    private func startEngineIfNeeded() {
+        guard !engineStarted, !engineStartFailed else { return }
+        engineStarted = true
+
+        engine.attach(micPlayer)
+        engine.attach(sysPlayer)
+        engine.connect(micPlayer, to: engine.mainMixerNode, format: standardFormat)
+        engine.connect(sysPlayer, to: engine.mainMixerNode, format: standardFormat)
+
+        // We don't want hardware playback — only the tapped mix.
+        engine.mainMixerNode.outputVolume = 0
+
+        let tapFormat = engine.mainMixerNode.outputFormat(forBus: 0)
+        engine.mainMixerNode.installTap(
+            onBus: 0,
+            bufferSize: 1024,
+            format: tapFormat
+        ) { [weak self] (buffer, _) in
+            // Tap callback runs on a real-time audio thread.
+            // Hop into the actor to forward.
+            let copy = AudioMixer.copyPCMBuffer(buffer)
+            Task { [weak self] in await self?.emitMixed(copy) }
+        }
+
+        do {
+            try engine.start()
+            micPlayer.play()
+            sysPlayer.play()
+        } catch {
+            engineStartFailed = true
+            engineStarted = false
+        }
+    }
+
+    public func stop() {
+        if engineStarted {
+            engine.mainMixerNode.removeTap(onBus: 0)
+            micPlayer.stop()
+            sysPlayer.stop()
+            engine.stop()
+        }
+        engineStarted = false
+        engineStartFailed = false
+        sysConverter = nil
+        micConverter = nil
+        sysSourceFormat = nil
+        micSourceFormat = nil
+        ptsBase = nil
+        ptsCumulativeFrames = 0
+    }
+
     // MARK: Ingest
 
     public func acceptSystem(_ wrapped: SendableSample) {
         guard config.systemEnabled else { return }
-        // v0.1: ALWAYS pass system audio straight through. The previous
-        // "wait for matching mic buffer" flow caused multiple system samples
-        // to be silently dropped while waiting (system arrives faster than
-        // mic) — that produced the audible "electronic noise" the user
-        // reported. Now every system buffer reaches AssetWriter intact.
-        output?(wrapped.buffer)
+        if !config.micEnabled {
+            // Pass-through: no mixing needed.
+            output?(wrapped.buffer)
+            return
+        }
+        startEngineIfNeeded()
+        if engineStartFailed {
+            // Engine couldn't start — fall back to v0.1 system-priority
+            // pass-through so the recording still has audio.
+            output?(wrapped.buffer)
+            return
+        }
+        captureBaseTimestampIfNeeded(from: wrapped.buffer)
+        if let pcm = convertedPCM(
+            from: wrapped.buffer,
+            converter: &sysConverter,
+            sourceFormat: &sysSourceFormat
+        ) {
+            sysPlayer.scheduleBuffer(pcm, completionHandler: nil)
+        }
     }
 
     public func acceptMic(_ wrapped: SendableSample) {
         guard config.micEnabled else { return }
-        // v0.1: when system is also enabled, mic is silently dropped
-        // (system takes priority). When mic is the only source it passes
-        // straight through with no mixing.
-        if config.systemEnabled { return }
-        output?(wrapped.buffer)
-    }
-
-    // MARK: Mixing
-
-    private func flushIfReady() {
-        guard let sys = pendingSystem, let _ = pendingMic else { return }
-        defer {
-            pendingSystem = nil
-            pendingMic = nil
+        if !config.systemEnabled {
+            output?(wrapped.buffer)
+            return
         }
-
-        // v0.1 LIMITATION: byte-level PCM mixing produces audible distortion
-        // ("electronic noise") because mic and system audio arrive in
-        // different formats (sample rate, bit depth, channel count). The
-        // proper fix is an AVAudioEngine-based pipeline with AVAudioConverter
-        // doing per-stream format normalization before mixing — tracked as
-        // a follow-up to Phase 5 (US3 audio sources UI).
-        //
-        // For v0.1: when both sources are enabled, prefer SYSTEM audio
-        // and drop mic. Users explicitly turning on system audio almost
-        // always care about that source more (presentation / game / video
-        // content); single-source pass-through works perfectly.
-        output?(sys)
-        // TODO(v0.2): replace with AVAudioEngine-based real mixing.
-    }
-
-    private nonisolated func mix(master: CMSampleBuffer, slave: CMSampleBuffer) -> CMSampleBuffer? {
-        // Get format descriptions
-        guard
-            let fmtDesc = CMSampleBufferGetFormatDescription(master),
-            let asbd = CMAudioFormatDescriptionGetStreamBasicDescription(fmtDesc)?.pointee
-        else { return master }
-
-        // Read PCM data into mutable buffers
-        guard
-            let masterData = readPCM(master),
-            let slaveData  = readPCM(slave)
-        else { return master }
-
-        // Convert both to Float32, then sum + clamp
-        let masterFloats = bytesAsFloat32(masterData, asbd: asbd)
-        let slaveFloats  = bytesAsFloat32(slaveData,  asbd: asbd)
-
-        let count = min(masterFloats.count, slaveFloats.count)
-        var mixed = [Float](repeating: 0, count: count)
-        for i in 0..<count {
-            // Simple average then mild attenuation to avoid clipping.
-            let v = (masterFloats[i] + slaveFloats[i]) * 0.7
-            mixed[i] = max(-1.0, min(1.0, v))
+        startEngineIfNeeded()
+        if engineStartFailed {
+            // Engine fallback — drop mic so we don't double up with system
+            // pass-through (which would be the v0.1 behavior).
+            return
         }
-
-        // Re-pack as the original PCM format
-        let outBytes = float32AsBytes(mixed, asbd: asbd)
-        return rebuildSampleBuffer(template: master, bytes: outBytes)
+        if let pcm = convertedPCM(
+            from: wrapped.buffer,
+            converter: &micConverter,
+            sourceFormat: &micSourceFormat
+        ) {
+            micPlayer.scheduleBuffer(pcm, completionHandler: nil)
+        }
     }
 
-    private nonisolated func readPCM(_ sb: CMSampleBuffer) -> Data? {
-        guard let block = CMSampleBufferGetDataBuffer(sb) else { return nil }
-        var length = 0
-        var ptr: UnsafeMutablePointer<Int8>?
-        let status = CMBlockBufferGetDataPointer(
-            block, atOffset: 0, lengthAtOffsetOut: nil,
-            totalLengthOut: &length, dataPointerOut: &ptr
-        )
-        guard status == kCMBlockBufferNoErr, let ptr else { return nil }
-        return Data(bytes: ptr, count: length)
-    }
+    // MARK: PTS handling
 
-    private nonisolated func bytesAsFloat32(
-        _ data: Data,
-        asbd: AudioStreamBasicDescription
-    ) -> [Float] {
-        // We only handle 16-bit signed-int and 32-bit float here. SCK and
-        // AVCaptureSession both fall into one of these by default.
-        let bytesPerSample = Int(asbd.mBitsPerChannel / 8)
-        let count = data.count / bytesPerSample
-        var floats = [Float](repeating: 0, count: count)
-
-        if asbd.mFormatFlags & kAudioFormatFlagIsFloat != 0 {
-            data.withUnsafeBytes { raw in
-                let src = raw.bindMemory(to: Float.self)
-                for i in 0..<count { floats[i] = src[i] }
-            }
+    private func captureBaseTimestampIfNeeded(from sample: CMSampleBuffer) {
+        guard ptsBase == nil else { return }
+        let pts = CMSampleBufferGetPresentationTimeStamp(sample)
+        if CMTIME_IS_VALID(pts) {
+            ptsBase = pts
         } else {
-            data.withUnsafeBytes { raw in
-                let src = raw.bindMemory(to: Int16.self)
-                let denom: Float = 32_768.0
-                for i in 0..<count { floats[i] = Float(src[i]) / denom }
-            }
+            ptsBase = .zero
         }
-        return floats
     }
 
-    private nonisolated func float32AsBytes(
-        _ floats: [Float],
-        asbd: AudioStreamBasicDescription
-    ) -> Data {
-        if asbd.mFormatFlags & kAudioFormatFlagIsFloat != 0 {
-            return floats.withUnsafeBufferPointer { Data(buffer: $0) }
-        }
-        // Convert back to Int16
-        var int16s = [Int16](repeating: 0, count: floats.count)
-        for i in 0..<floats.count {
-            int16s[i] = Int16(max(-32768, min(32767, floats[i] * 32768)))
-        }
-        return int16s.withUnsafeBufferPointer { Data(buffer: $0) }
+    private func nextPTS(forFrames frames: Int64) -> (start: CMTime, duration: CMTime) {
+        let base = ptsBase ?? .zero
+        let sampleRate = Int32(AudioFormat.sampleRate)
+        let start = CMTimeAdd(
+            base,
+            CMTime(value: ptsCumulativeFrames, timescale: sampleRate)
+        )
+        let duration = CMTime(value: frames, timescale: sampleRate)
+        ptsCumulativeFrames += frames
+        return (start, duration)
     }
 
-    private nonisolated func rebuildSampleBuffer(
-        template: CMSampleBuffer,
-        bytes: Data
-    ) -> CMSampleBuffer? {
-        guard let fmtDesc = CMSampleBufferGetFormatDescription(template) else { return nil }
-        let pts = CMSampleBufferGetPresentationTimeStamp(template)
-        let dur = CMSampleBufferGetDuration(template)
+    // MARK: Conversion
 
+    private func convertedPCM(
+        from sample: CMSampleBuffer,
+        converter: inout AVAudioConverter?,
+        sourceFormat: inout AVAudioFormat?
+    ) -> AVAudioPCMBuffer? {
+        // Build / cache an AVAudioConverter for this source.
+        guard let fmtDesc = CMSampleBufferGetFormatDescription(sample),
+              let asbdPtr = CMAudioFormatDescriptionGetStreamBasicDescription(fmtDesc)
+        else { return nil }
+        let asbd = asbdPtr.pointee
+
+        if sourceFormat == nil {
+            var localASBD = asbd
+            sourceFormat = AVAudioFormat(streamDescription: &localASBD)
+        }
+        guard let srcFmt = sourceFormat else { return nil }
+
+        if converter == nil {
+            converter = AVAudioConverter(from: srcFmt, to: standardFormat)
+        }
+        guard let cv = converter else { return nil }
+
+        // Wrap CMSampleBuffer's PCM data in an input AVAudioPCMBuffer.
+        let frames = AVAudioFrameCount(CMSampleBufferGetNumSamples(sample))
+        guard frames > 0,
+              let inBuf = AVAudioPCMBuffer(pcmFormat: srcFmt, frameCapacity: frames)
+        else { return nil }
+        inBuf.frameLength = frames
+
+        // Copy PCM bytes from the CMBlockBuffer into the input buffer.
         var blockBuffer: CMBlockBuffer?
-        let status1 = CMBlockBufferCreateWithMemoryBlock(
-            allocator: kCFAllocatorDefault,
-            memoryBlock: nil,
-            blockLength: bytes.count,
-            blockAllocator: kCFAllocatorDefault,
-            customBlockSource: nil,
-            offsetToData: 0,
-            dataLength: bytes.count,
-            flags: 0,
+        var audioBufferList = AudioBufferList()
+        let status = CMSampleBufferGetAudioBufferListWithRetainedBlockBuffer(
+            sample,
+            bufferListSizeNeededOut: nil,
+            bufferListOut: &audioBufferList,
+            bufferListSize: MemoryLayout<AudioBufferList>.size,
+            blockBufferAllocator: nil,
+            blockBufferMemoryAllocator: nil,
+            flags: kCMSampleBufferFlag_AudioBufferList_Assure16ByteAlignment,
             blockBufferOut: &blockBuffer
         )
-        guard status1 == noErr, let blockBuffer else { return nil }
+        guard status == noErr, blockBuffer != nil else { return nil }
 
-        bytes.withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-            _ = CMBlockBufferReplaceDataBytes(
-                with: raw.baseAddress!,
-                blockBuffer: blockBuffer,
-                offsetIntoDestination: 0,
-                dataLength: bytes.count
-            )
+        // Manual copy — we have to handle interleaved vs deinterleaved.
+        let audioBufferListPtr = UnsafeMutableAudioBufferListPointer(&audioBufferList)
+        if asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved != 0,
+           audioBufferListPtr.count == Int(srcFmt.channelCount) {
+            for ch in 0..<Int(srcFmt.channelCount) {
+                let src = audioBufferListPtr[ch]
+                if let inChannelData = inBuf.floatChannelData?[ch],
+                   let srcData = src.mData?.assumingMemoryBound(to: Float.self) {
+                    let count = Int(src.mDataByteSize) / MemoryLayout<Float>.size
+                    inChannelData.update(from: srcData, count: count)
+                } else if let inChannelData = inBuf.int16ChannelData?[ch],
+                          let srcData = src.mData?.assumingMemoryBound(to: Int16.self) {
+                    let count = Int(src.mDataByteSize) / MemoryLayout<Int16>.size
+                    inChannelData.update(from: srcData, count: count)
+                }
+            }
+        } else if let firstBuffer = audioBufferListPtr.first,
+                  let srcRaw = firstBuffer.mData {
+            // Interleaved single-buffer case
+            if let inChannelData = inBuf.floatChannelData {
+                let frames = Int(inBuf.frameLength)
+                let channels = Int(srcFmt.channelCount)
+                let srcFloats = srcRaw.assumingMemoryBound(to: Float.self)
+                for ch in 0..<channels {
+                    for f in 0..<frames {
+                        inChannelData[ch][f] = srcFloats[f * channels + ch]
+                    }
+                }
+            } else if let inChannelData = inBuf.int16ChannelData {
+                let frames = Int(inBuf.frameLength)
+                let channels = Int(srcFmt.channelCount)
+                let srcInts = srcRaw.assumingMemoryBound(to: Int16.self)
+                for ch in 0..<channels {
+                    for f in 0..<frames {
+                        inChannelData[ch][f] = srcInts[f * channels + ch]
+                    }
+                }
+            }
         }
 
-        var sampleSizes: [Int] = [bytes.count]
-        var newSB: CMSampleBuffer?
-        let status2 = CMSampleBufferCreate(
+        // Convert to standardFormat.
+        let ratio = standardFormat.sampleRate / srcFmt.sampleRate
+        let outCapacity = AVAudioFrameCount(Double(frames) * ratio + 1024)
+        guard let outBuf = AVAudioPCMBuffer(
+            pcmFormat: standardFormat,
+            frameCapacity: outCapacity
+        ) else { return nil }
+
+        // Use a tiny class wrapper to hold the "supplied" flag and the
+        // input buffer reference. AVAudioConverterInputBlock is @Sendable,
+        // so capturing mutable vars or non-Sendable types directly fails
+        // under Swift 6 strict concurrency.
+        let state = ConverterState(input: inBuf)
+        var convertError: NSError?
+        let inputBlock: AVAudioConverterInputBlock = { _, outStatus in
+            state.deliverNext(outStatus: outStatus)
+        }
+        let _ = cv.convert(to: outBuf, error: &convertError, withInputFrom: inputBlock)
+        if convertError != nil { return nil }
+        return outBuf
+    }
+
+    // MARK: Tap → CMSampleBuffer emission
+
+    private func emitMixed(_ buffer: AVAudioPCMBuffer) async {
+        guard let output = output else { return }
+        let frames = Int64(buffer.frameLength)
+        guard frames > 0 else { return }
+
+        let (startPTS, duration) = nextPTS(forFrames: frames)
+
+        if let cmSample = AudioMixer.makeCMSampleBuffer(
+            from: buffer,
+            startPTS: startPTS,
+            duration: duration
+        ) {
+            output(cmSample)
+        }
+    }
+
+    // MARK: Helpers
+
+    private nonisolated static func copyPCMBuffer(_ buffer: AVAudioPCMBuffer) -> AVAudioPCMBuffer {
+        // Buffer from the tap is owned by the audio thread; copy before
+        // ferrying it across actor boundaries.
+        let copy = AVAudioPCMBuffer(
+            pcmFormat: buffer.format,
+            frameCapacity: buffer.frameCapacity
+        )!
+        copy.frameLength = buffer.frameLength
+        if let srcChannels = buffer.floatChannelData,
+           let dstChannels = copy.floatChannelData {
+            for ch in 0..<Int(buffer.format.channelCount) {
+                dstChannels[ch].update(
+                    from: srcChannels[ch],
+                    count: Int(buffer.frameLength)
+                )
+            }
+        }
+        return copy
+    }
+
+    // MARK: - Conversion helper
+
+    /// Holds AVAudioConverter input state. Class so the @Sendable input
+    /// block can mutate without Swift 6 captured-var errors.
+    private final class ConverterState: @unchecked Sendable {
+        let input: AVAudioPCMBuffer
+        private var supplied = false
+        init(input: AVAudioPCMBuffer) { self.input = input }
+        func deliverNext(outStatus: UnsafeMutablePointer<AVAudioConverterInputStatus>) -> AVAudioPCMBuffer? {
+            if supplied {
+                outStatus.pointee = .endOfStream
+                return nil
+            }
+            supplied = true
+            outStatus.pointee = .haveData
+            return input
+        }
+    }
+
+    private nonisolated static func makeCMSampleBuffer(
+        from buffer: AVAudioPCMBuffer,
+        startPTS: CMTime,
+        duration: CMTime
+    ) -> CMSampleBuffer? {
+        let format = buffer.format
+        var asbdMutable = format.streamDescription.pointee
+
+        // CMAudioFormatDescription
+        var fmtDesc: CMAudioFormatDescription?
+        var status = CMAudioFormatDescriptionCreate(
             allocator: kCFAllocatorDefault,
-            dataBuffer: blockBuffer,
-            dataReady: true,
+            asbd: &asbdMutable,
+            layoutSize: 0,
+            layout: nil,
+            magicCookieSize: 0,
+            magicCookie: nil,
+            extensions: nil,
+            formatDescriptionOut: &fmtDesc
+        )
+        guard status == noErr, let fmtDesc else { return nil }
+
+        // Build a CMSampleBuffer that wraps the PCM buffer's audioBufferList.
+        var sampleBuffer: CMSampleBuffer?
+        let timing = CMSampleTimingInfo(
+            duration: duration,
+            presentationTimeStamp: startPTS,
+            decodeTimeStamp: .invalid
+        )
+        status = CMAudioSampleBufferCreateWithPacketDescriptions(
+            allocator: kCFAllocatorDefault,
+            dataBuffer: nil,
+            dataReady: false,
             makeDataReadyCallback: nil,
             refcon: nil,
             formatDescription: fmtDesc,
-            sampleCount: 1,
-            sampleTimingEntryCount: 1,
-            sampleTimingArray: [CMSampleTimingInfo(duration: dur, presentationTimeStamp: pts, decodeTimeStamp: .invalid)],
-            sampleSizeEntryCount: 1,
-            sampleSizeArray: &sampleSizes,
-            sampleBufferOut: &newSB
+            sampleCount: CMItemCount(buffer.frameLength),
+            presentationTimeStamp: startPTS,
+            packetDescriptions: nil,
+            sampleBufferOut: &sampleBuffer
         )
-        return status2 == noErr ? newSB : nil
+        _ = timing  // silence unused-var
+        guard status == noErr, let sampleBuffer else { return nil }
+
+        // Now copy the PCM data into the sample buffer
+        status = CMSampleBufferSetDataBufferFromAudioBufferList(
+            sampleBuffer,
+            blockBufferAllocator: kCFAllocatorDefault,
+            blockBufferMemoryAllocator: kCFAllocatorDefault,
+            flags: 0,
+            bufferList: buffer.mutableAudioBufferList
+        )
+        guard status == noErr else { return nil }
+
+        return sampleBuffer
     }
 }
