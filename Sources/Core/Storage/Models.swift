@@ -99,18 +99,20 @@ public struct RecordingPreset: Sendable, Codable, Equatable {
 
     /// 工厂 — 出厂默认值。
     ///
-    /// v0.2 起：默认 .both（mic + system 都录），AudioMixer 已用
-    /// AVAudioEngine 实现真混音 — mic 和 system 经过 AVAudioConverter 各自
-    /// 归一化到 Float32 48kHz stereo，再经 mainMixerNode 真正合到一条
-    /// AAC 音轨。直接对齐 spec FR-011。
+    /// v0.1 (current): 默认 .sysOnly（只录系统音）。AudioMixer 的 v0.2
+    /// AVAudioEngine 真混音路径写好了但有未解的 buffer-drop 问题（见
+    /// AudioMixer.swift "KNOWN ISSUE" 注释），所以用户开 .both 时
+    /// quick-fix 会丢 mic、只留 system —— 那不如干脆默认就只 system，
+    /// UX 上更诚实。
     ///
-    /// 单路开启（仅 mic 或仅 system）仍然走 bit-exact pass-through，
-    /// 不进 engine，性能与 v0.1 一致。
+    /// v0.2 计划: 修好 AVAudioEngine 路径或用手写 PCM 转换+混音替换，
+    /// 然后这里改回 .both。同时 Phase 5 (US3) 的音频源 toggle UI 上线后，
+    /// 用户随时能在 UI 里切换。
     public static let factoryDefault = RecordingPreset(
         name: lastUsedName,
         mode: .video,
         target: .default,
-        audioSources: .both,
+        audioSources: .sysOnly,
         videoConfig: .default
     )
 
