@@ -146,17 +146,34 @@ public actor AudioMixer {
 
     // MARK: Ingest
 
+    // ⚠️ KNOWN ISSUE (2026-05-08): the AVAudioEngine path below produces
+    // an audio track with the right format (2 ch / 48 kHz / AAC) but
+    // almost no actual sample data — the tap → emitMixed → writer chain
+    // appears to drop most buffers when ferried across the
+    // audio-thread → actor boundary. Diagnosing this needs more
+    // engine/timing debugging than fits in v0.1.
+    //
+    // For now we route everything through the v0.1 system-priority
+    // pass-through path (no mixing, system audio is bit-exact). The
+    // AVAudioEngine code below is preserved for the v0.2 follow-up
+    // when there's time to dig in (likely candidates: switch from
+    // AVAudioPlayerNode + scheduleBuffer to a manual-rendering
+    // AVAudioSourceNode pulling from a ring buffer; or skip
+    // AVAudioEngine entirely and do the conversion + mixing manually
+    // with AVAudioConverter + sample-aligned summation).
+    private static let useEnginePath = false
+
     public func acceptSystem(_ wrapped: SendableSample) {
         guard config.systemEnabled else { return }
-        if !config.micEnabled {
-            // Pass-through: no mixing needed.
+        // v0.1 pass-through path: system audio always streams straight to
+        // the writer. Single-source bit-exact, two-source = system priority.
+        if !Self.useEnginePath || !config.micEnabled {
             output?(wrapped.buffer)
             return
         }
+        // ── (Future v0.2 path, currently disabled) ─────────────────
         startEngineIfNeeded()
         if engineStartFailed {
-            // Engine couldn't start — fall back to v0.1 system-priority
-            // pass-through so the recording still has audio.
             output?(wrapped.buffer)
             return
         }
@@ -172,14 +189,20 @@ public actor AudioMixer {
 
     public func acceptMic(_ wrapped: SendableSample) {
         guard config.micEnabled else { return }
+        // v0.1 pass-through path: when system is also enabled, mic is
+        // silently dropped (system priority). When mic is the only source
+        // it goes straight through.
+        if !Self.useEnginePath {
+            if !config.systemEnabled { output?(wrapped.buffer) }
+            return
+        }
+        // ── (Future v0.2 path, currently disabled) ─────────────────
         if !config.systemEnabled {
             output?(wrapped.buffer)
             return
         }
         startEngineIfNeeded()
         if engineStartFailed {
-            // Engine fallback — drop mic so we don't double up with system
-            // pass-through (which would be the v0.1 behavior).
             return
         }
         if let pcm = convertedPCM(
