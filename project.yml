@@ -24,7 +24,12 @@ settings:
     PRODUCT_BUNDLE_IDENTIFIER: com.zzming.good-recording
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
-    CODE_SIGN_STYLE: Automatic
+    # Local dev signing identity (created by scripts/make-local-cert.sh).
+    # Stable across rebuilds, so macOS TCC keeps the user's Screen
+    # Recording / Microphone grants valid. To use Apple Developer ID
+    # instead, override these on the xcodebuild command line.
+    CODE_SIGN_STYLE: Manual
+    CODE_SIGN_IDENTITY: "GoodRecording Local Dev"
     DEAD_CODE_STRIPPING: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
