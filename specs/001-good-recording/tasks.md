@@ -44,27 +44,29 @@ independently completable; the only hard ordering is Setup → Foundational
 settings, entitlements, scripts. After this phase the project compiles
 and produces an empty `.app` bundle that passes Sandbox + signing.
 
-> **Implementation note (2026-05-08)**: Phases 1–3 (47/118 tasks)
-> completed in the sibling repository `~/project/good-recording/`
-> (NOT under `apps/` in this repo) per the user's choice during
-> /speckit-implement. File paths referenced below have been resolved
-> to that sibling repo's root (drop the leading `apps/good-recording/`).
+> **Implementation note (2026-05-08, monorepo update)**: Phases 1–3
+> (47/118 tasks) are complete in `apps/good-recording/` under this
+> same repo. Originally built as a sibling repository at
+> `~/project/good-recording/` then merged in via `git subtree add`
+> (commit `d2c3188`) to make the monorepo migration easier. All
+> implementation history is preserved.
 >
-> **v0.1 MVP is now functional.** US1 (一键录屏) is fully implemented
-> and ships behind a single button: open the app → click 开始录制 →
-> stop → file in `~/Movies/Good Recording/`. Verified end-to-end with
-> 20 unit tests (all passing) on Xcode 26.4.1 / Apple Silicon.
+> **v0.1 MVP is functional.** US1 (一键录屏) ships behind a single
+> button: open the app → click 开始录制 → stop → file in
+> `~/Movies/Good Recording/`. Verified end-to-end with 20 unit tests
+> (all passing) on Xcode 26.4.1 / Apple Silicon.
 >
-> Sibling repo commits in chronological order:
+> Implementation milestone commits (now part of this repo's history):
 >   • `c018162` [Spec Kit] Phase 1 Setup skeleton (T001–T012)
->   • `93eb2f0` fix(scripts): preflight check for full Xcode
->   • `5b4067c` fix(project.yml): stop XcodeGen overwriting plist/entitlements
->   • `502298f` feat(scripts): add setup-xcode.sh
 >   • `253b4e6` [Spec Kit] Phase 2 Foundational (T013–T029)
 >   • `c2b1a23` [Spec Kit] Phase 3 US1 MVP — 一键录屏 (T030–T047)
+>   • plus 11 fix/feat commits for dev environment + bug fixes
 >
 > Remaining phases (T048–T118): US2 (range selection), US3 (audio
 > sources), US4 (quality settings), US5 (audio-only), Polish.
+>
+> When references below say "apps/good-recording/Sources/...", that
+> path is now relative to *this repo's root*, not a sibling.
 
 - [X] T001 Create monorepo skeleton: `apps/good-recording/`, `scripts/`, `scripts/ci/` directories at repo root *(executed as repo-root layout in sibling repo: `Sources/`, `Resources/`, `Tests/`, `scripts/`, `scripts/ci/`)*
 - [X] T002 Initialize Xcode project at `apps/good-recording/GoodRecording.xcodeproj` with one app target (`GoodRecording`) and three test targets (`UnitTests`, `IntegrationTests`, `UITests`) *(materialized via XcodeGen `project.yml`; .xcodeproj is gitignored and reproducible by `xcodegen generate`)*

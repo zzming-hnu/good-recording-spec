@@ -3,7 +3,7 @@
 **Feature**: 001-good-recording
 **Last updated**: 2026-05-08
 **Audience**: anyone setting up the implementation repo
-(`~/project/good-recording/`) on a fresh macOS 26 dev machine.
+(`apps/good-recording/`) on a fresh macOS 26 dev machine.
 
 This document is the lived-experience companion to
 [`quickstart.md`](./quickstart.md). `quickstart.md` tells you the
@@ -23,7 +23,7 @@ symptom, root cause, fix).
    not, run `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
    then `sudo xcodebuild -license accept`.
 2. `brew install xcodegen`.
-3. `cd ~/project/good-recording && ./scripts/setup-xcode.sh` —
+3. `cd apps/good-recording && ./scripts/setup-xcode.sh` —
    one-shot Xcode setup + smoke build.
 4. `./scripts/make-local-cert.sh` — creates a stable self-signed
    code-signing identity. You'll need to enter your **macOS login
