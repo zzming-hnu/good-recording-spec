@@ -98,11 +98,14 @@ public struct RecordingPreset: Sendable, Codable, Equatable {
     public static let lastUsedName = "_lastUsed"
 
     /// 工厂 — 出厂默认值。
+    /// v1 阶段：默认同时录 mic + system，让用户开箱即得"教学视频/会议录制"
+    /// 最常见的双轨场景。Phase 5 (US3) 会引入独立 toggle UI 后，这个
+    /// 默认值可以回归到 spec 推荐的 `.micOnly`（隐私最小化）。
     public static let factoryDefault = RecordingPreset(
         name: lastUsedName,
         mode: .video,
         target: .default,
-        audioSources: .default,
+        audioSources: .both,
         videoConfig: .default
     )
 
