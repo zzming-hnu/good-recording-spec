@@ -1,0 +1,134 @@
+---
+alwaysApply: true
+---
+
+# good-recording — implementation companion to `home-spec`
+
+This repository (`~/project/good-recording/`) is the macOS Swift
+implementation. **The canonical spec, plan, contracts, and decisions
+all live in a sibling repository** at:
+
+```
+/Users/zzming/project/home-spec/
+```
+
+That sibling is set up as a Spec Kit project. Before making any
+substantive change to Swift sources, scripts, or configuration here,
+you MUST read the following files (outside this workspace, but
+readable on disk via the Read tool):
+
+## Constitution (always-binding rules)
+
+- `/Users/zzming/project/home-spec/.specify/memory/constitution.md`
+  (v1.0.0) — five non-negotiable principles plus macOS platform
+  constraints + governance. Any change here must respect these:
+  1. **本地优先与隐私保护 (NON-NEGOTIABLE)** — no telemetry, no network
+     calls in default config, all data stays on device, transparent
+     computation. Adding any third-party SDK that touches the network
+     is a hard violation.
+  2. **普通用户为中心的简洁体验** — main path ≤ 3 steps, everyday
+     language only (no `JSON`/`path`/`endpoint`/`hash` leaking to
+     users), every reversible action is undoable, every irreversible
+     action confirmed.
+  3. **独立可测与渐进交付 (NON-NEGOTIABLE)** — every feature ships
+     behind a flag (see `Sources/App/FeatureFlags.swift`), TDD for
+     constitution-touching code, no cross-Feature imports between
+     `Sources/Features/US{N}-*` modules (CI lint
+     `scripts/ci/xc-dependency-lint.sh` enforces).
+  4. **macOS 原生与平台一致性** — App Sandbox + Hardened Runtime
+     (Release) + Notarization, follow Apple HIG, support Universal
+     Binary, min macOS 15 (Sequoia).
+  5. **本地可观测与可恢复** — structured local logs (`Logger`),
+     user-visible/exportable/clearable, plain-text data export, local
+     crash reports.
+
+## Feature spec & design
+
+- `/Users/zzming/project/home-spec/specs/001-good-recording/spec.md` —
+  feature spec (5 user stories US1..US5, 29 functional requirements,
+  10 success criteria, 11 documented assumptions).
+- `/Users/zzming/project/home-spec/specs/001-good-recording/plan.md` —
+  implementation plan (Swift 6 + SwiftUI + ScreenCaptureKit +
+  AVFoundation, sibling-repo layout, Constitution Check 6/6 PASS).
+- `/Users/zzming/project/home-spec/specs/001-good-recording/research.md` —
+  10 finalized technical decisions with rationale + alternatives.
+- `/Users/zzming/project/home-spec/specs/001-good-recording/data-model.md` —
+  `Recording` / `RecordingPreset` / `Settings` entities + state machines.
+
+## Interface contracts (mirrors of code shape)
+
+- `/Users/zzming/project/home-spec/specs/001-good-recording/contracts/ui-surfaces.md` —
+  10 UI surfaces (S1 MainWindow, S4 MenuBarStatusItem, S7 PermissionCard,
+  S10 system notifications, …) with states + transitions + accessibility.
+- `/Users/zzming/project/home-spec/specs/001-good-recording/contracts/output-files.md` —
+  file naming (`Recording {YYYY-MM-DD} {HH.MM.SS}.{ext}`), save
+  locations, encoding params, acceptance gate.
+- `/Users/zzming/project/home-spec/specs/001-good-recording/contracts/permissions.md` —
+  TCC + entitlements matrix, `NSUsageDescription` strings, forbidden
+  entitlement list (CI lint enforces).
+- `/Users/zzming/project/home-spec/specs/001-good-recording/contracts/logs.md` —
+  log location (sandbox `Library/Logs/GoodRecording/`), rotation
+  (30d / 100MB), full event catalog, hard privacy rules.
+
+## Task list & status
+
+- `/Users/zzming/project/home-spec/specs/001-good-recording/tasks.md` —
+  118 tasks. As of 2026-05-08:
+  - Phase 1 Setup (T001–T012): ✅ 12/12
+  - Phase 2 Foundational (T013–T029): ✅ 17/17
+  - Phase 3 US1 MVP (T030–T047): ✅ 18/18
+  - Phase 4 US2 Range Selection (T048–T063): pending
+  - Phase 5 US3 Audio Sources UI (T064–T079): pending
+  - Phase 6 US4 Quality Settings (T080–T093): pending
+  - Phase 7 US5 Audio-Only Mode (T094–T103): pending
+  - Phase 8 Polish (T104–T118): pending
+  - Cumulative: 47 / 118 done.
+
+## Trapdoors & dev environment
+
+- `/Users/zzming/project/home-spec/specs/001-good-recording/troubleshooting.md` —
+  11 known issues from the v0.1 buildout (TCC silent reject for
+  ad-hoc apps, cdhash drift, .debug.dylib team mismatch, cfprefsd
+  cache, AssetWriter acceptance gate on .partial, etc.) — read this
+  before debugging anything that doesn't make sense.
+- `/Users/zzming/project/home-spec/specs/001-good-recording/quickstart.md` —
+  build / run / test recipe.
+
+## Known v0.1 limitations (encoded into this repo)
+
+- `RecordingPreset.factoryDefault.audioSources = .sysOnly` — only
+  records system audio by default. Default `.both` would activate
+  the partially-broken AVAudioEngine mixer in
+  `Sources/Core/Encoding/AudioMixer.swift` (look for the "KNOWN
+  ISSUE" comment + `useEnginePath = false` flag).
+- v0.2 mixer rewrite is the highest-priority follow-up. Two
+  candidate approaches in the file's comment header.
+
+## What to do BEFORE making changes
+
+1. **Read at least the spec section relevant to your change.** If
+   you're touching capture code, read research.md R1/R2 + the
+   relevant US story. If you're touching UI, read
+   contracts/ui-surfaces.md.
+2. **Check if there's a relevant task** in tasks.md. If yes, mark
+   it `[X]` after completing.
+3. **Check the constitution** for any non-negotiable principle that
+   touches your change. NON-NEGOTIABLE principles (I and III) cannot
+   be relaxed without a constitution amendment.
+4. **Use commit messages that link back to spec/plan refs**
+   (e.g., `fix(audio): align AudioMixer with FR-011 (research.md R2)`).
+
+## What changes belong in spec vs. here
+
+| Change type | Goes in `home-spec` | Goes here |
+|---|---|---|
+| New user story / new feature | spec.md update + tasks.md | implementation Swift |
+| Behavior change to existing FR | spec.md FR text update | implementation Swift |
+| Implementation detail change (refactor) | (nothing) | Swift |
+| Build / signing / dev tooling | troubleshooting.md note | scripts + project.yml |
+| New "known issue" you discovered | troubleshooting.md | code workaround |
+| New decision / tradeoff | research.md (new R{N}) | implementation |
+
+If unsure, write the change in this repo first then ask whether it
+needs a spec mirror. Don't silently drift the implementation away
+from the spec.

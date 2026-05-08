@@ -1,0 +1,69 @@
+{
+  "sourceLanguage" : "zh-Hans",
+  "strings" : {
+    "App.Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Good Recording" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "Good Recording" } }
+      }
+    },
+    "App.Subtitle" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Local-first screen + audio recording" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "本地优先的屏幕与音频录制" } }
+      }
+    },
+    "Btn.StartRecording" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Start Recording" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "开始录制" } }
+      }
+    },
+    "Btn.StopRecording" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Stop Recording" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "停止录制" } }
+      }
+    },
+    "Banner.Saved" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Saved" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已保存" } }
+      }
+    },
+    "Banner.RevealInFinder" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reveal in Finder" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "在 Finder 中显示" } }
+      }
+    },
+    "Permission.OpenSettings" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Open System Settings" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "打开系统设置" } }
+      }
+    },
+    "Permission.Later" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Not now" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "稍后再说" } }
+      }
+    },
+    "Privacy.NoNetwork" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "We never send your data off this device." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "我们不会将任何数据发送到设备之外。" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
