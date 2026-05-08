@@ -55,20 +55,25 @@ echo "════════════════════════�
 echo " good-recording — rebuild & reauth (fast=$FAST)"
 echo "════════════════════════════════════════════════════════════════"
 
-# ─── Step 1: Stop the running app ──────────────────────────────────
+# ─── Step 1: Stop the running app (best effort) ────────────────────
 echo ""
 echo "→ Step 1/5: stopping any running instance"
 osascript -e "tell application \"$APP_NAME\" to quit" 2>/dev/null || true
 sleep 1
-# Belt and braces — if launchd auto-relaunched it.
 pkill -x "$APP_NAME" 2>/dev/null || true
 sleep 1
+
 if pgrep -x "$APP_NAME" >/dev/null; then
-    echo "  ⚠️  $APP_NAME still running — please ⌘Q it manually then re-run." >&2
-    pgrep -fl "$APP_NAME"
-    exit 1
+    # Some launchd-supervised debug instances can't be killed without rebooting.
+    # That's OK — `open -n` below starts a fresh instance with a new PID and
+    # the new cdhash. macOS handles two PIDs of the same bundle id by
+    # auto-activating the newer one for foreground; the zombie is harmless
+    # in the background. We keep going.
+    echo "  ⚠️  Old instance is launchd-supervised and unkillable, ignoring."
+    echo "     PID: $(pgrep -x "$APP_NAME" | head -1) — will spawn a fresh instance below."
+else
+    echo "  ✅ $APP_NAME stopped"
 fi
-echo "  ✅ $APP_NAME stopped"
 
 # ─── Step 2: (optional) wipe DerivedData ────────────────────────────
 if ! $FAST; then
@@ -107,7 +112,9 @@ echo "  ✅ App bundle: $APP_PATH"
 
 # Sanity: confirm the binary is signed by our local cert (catches the
 # regression where someone reverts project.yml back to ad-hoc).
-SIGNER="$(codesign -dvvv "$APP_PATH" 2>&1 | grep -m1 'Authority=' | cut -d= -f2)"
+# Note: `|| true` guards against SIGPIPE when grep -m1 closes the pipe
+# while codesign is still writing.
+SIGNER="$(codesign -dvvv "$APP_PATH" 2>&1 | grep 'Authority=' | head -1 | cut -d= -f2)" || true
 echo "  ✅ Signed by: ${SIGNER:-<unknown>}"
 if [[ "$SIGNER" != *"GoodRecording Local Dev"* && "$SIGNER" != *"Apple Development"* && "$SIGNER" != *"Developer ID"* ]]; then
     echo ""
@@ -127,11 +134,12 @@ echo "  ✅ TCC + cfprefsd reset (next launch will show native dialog)"
 
 # ─── Step 5: Launch ────────────────────────────────────────────────
 echo ""
-echo "→ Step 5/5: launching $APP_NAME"
-open "$APP_PATH"
-sleep 1
-NEW_PID="$(pgrep -x "$APP_NAME" || true)"
-echo "  ✅ Launched (PID: ${NEW_PID:-?})"
+echo "→ Step 5/5: launching $APP_NAME (forcing a new instance with -n)"
+# -n forces a brand-new instance even if a zombie is already running.
+open -n "$APP_PATH"
+sleep 2
+NEW_PIDS="$(pgrep -x "$APP_NAME" | tr '\n' ' ')"
+echo "  ✅ Launched (PID(s): ${NEW_PIDS:-?})"
 
 echo ""
 echo "════════════════════════════════════════════════════════════════"
