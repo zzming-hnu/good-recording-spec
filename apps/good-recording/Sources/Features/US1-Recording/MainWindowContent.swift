@@ -17,11 +17,12 @@ struct MainWindowContentView: View {
             VStack(spacing: 24) {
                 Spacer(minLength: 8)
 
-                // App identity
+                // App identity (v0.1: hard-coded zh-Hans;
+                // i18n via Localizable.xcstrings is a Phase 8 Polish task)
                 VStack(spacing: 4) {
-                    Text("App.Title")
+                    Text(verbatim: "Good Recording")
                         .font(.system(size: 28, weight: .semibold))
-                    Text("App.Subtitle")
+                    Text(verbatim: "本地优先的屏幕与音频录制")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
