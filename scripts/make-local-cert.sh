@@ -64,16 +64,32 @@ openssl req -new -x509 -newkey rsa:2048 -nodes \
     -keyout cert.key -out cert.crt -days 3650 \
     -config openssl.cnf 2>/dev/null
 
-openssl pkcs12 -export -out cert.p12 \
+# NOTE: OpenSSL 3 + empty password creates a .p12 with PBES2-encrypted
+# MAC that macOS `security import` cannot validate. Use a fixed non-empty
+# throwaway password — it only protects the .p12 in transit between the
+# two CLIs (the file is deleted at end-of-script).
+P12_PASS="goodrecording"
+
+# -legacy forces OpenSSL 3 to use the original PKCS#12 v1 ciphers (PBE
+# with SHA1 + 3DES + RC2-40), which is what macOS `security` reliably
+# understands. Without -legacy, OpenSSL 3 defaults to PBES2 + AES which
+# macOS rejects with "MAC verification failed".
+OPENSSL_LEGACY=""
+if openssl pkcs12 -help 2>&1 | grep -q -- "-legacy"; then
+    OPENSSL_LEGACY="-legacy"
+fi
+
+openssl pkcs12 -export $OPENSSL_LEGACY -out cert.p12 \
     -inkey cert.key -in cert.crt \
-    -name "$CERT_NAME" -passout pass: 2>/dev/null
+    -name "$CERT_NAME" \
+    -passout "pass:$P12_PASS" 2>/dev/null
 
 echo "  ✅ cert.p12 generated"
 
 echo ""
 echo "→ Step 2/5: Importing cert + private key into login keychain"
 echo "  (Keychain Access may pop up asking you to allow access — click Always Allow)"
-security import cert.p12 -k "$CERT_KEYCHAIN" -P "" \
+security import cert.p12 -k "$CERT_KEYCHAIN" -P "$P12_PASS" \
     -T /usr/bin/codesign \
     -T /usr/bin/security \
     -T /usr/bin/productsign \
