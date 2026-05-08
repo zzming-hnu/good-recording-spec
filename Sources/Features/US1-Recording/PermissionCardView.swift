@@ -9,6 +9,9 @@ struct PermissionCardView: View {
     let missing: Permission
     let onOpenSettings: () -> Void
     let onDismiss:      () -> Void
+    var onRetry: (() -> Void)? = nil
+
+    @State private var showAdvanced = false
 
     var body: some View {
         VStack(spacing: 16) {
@@ -29,9 +32,34 @@ struct PermissionCardView: View {
             .font(.body)
             .frame(maxWidth: .infinity, alignment: .leading)
 
+            // 「我已经给过权限了」展开区
+            DisclosureGroup(isExpanded: $showAdvanced) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(verbatim: "如果你之前已经在系统设置里给过权限：")
+                        .font(.subheadline.weight(.medium))
+                    Text(verbatim: "1. 完全退出 good-recording (⌘Q)")
+                    Text(verbatim: "2. 在「系统设置 → 隐私与安全性 → 屏幕录制」里把 good-recording 关掉再打开")
+                    Text(verbatim: "3. 重新打开 good-recording 试一次")
+                    Text(verbatim: "（开发版应用每次重新编译都会被 macOS 视作新应用，需要重新授权一次。正式分发版无此问题。）")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .padding(.top, 4)
+                }
+                .font(.callout)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 6)
+            } label: {
+                Text(verbatim: "我已经给过权限了？")
+                    .font(.subheadline)
+                    .foregroundStyle(.tint)
+            }
+
             HStack {
                 Button("稍后再说") { onDismiss() }
                     .keyboardShortcut(.escape, modifiers: [])
+                if let onRetry {
+                    Button("重新检测") { onRetry() }
+                }
                 Spacer()
                 Button("打开系统设置") { onOpenSettings() }
                     .keyboardShortcut(.return, modifiers: [])
@@ -40,7 +68,7 @@ struct PermissionCardView: View {
             }
         }
         .padding(20)
-        .frame(maxWidth: 420)
+        .frame(maxWidth: 480)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 16))
         .overlay(
             RoundedRectangle(cornerRadius: 16)

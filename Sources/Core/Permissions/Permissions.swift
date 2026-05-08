@@ -8,6 +8,7 @@ import AVFoundation
 import ScreenCaptureKit
 import UserNotifications
 import AppKit
+import CoreGraphics
 
 public enum PermissionStatus: String, Sendable {
     case notDetermined
@@ -24,17 +25,18 @@ public enum Permissions {
 
     // MARK: Screen Recording (TCC, no entitlement key)
 
-    /// 屏幕录制权限：通过尝试 `SCShareableContent.current` 来检测 — 这是
-    /// macOS 上唯一可靠的「我现在能不能用 SCK」探测方式。
-    public static func screenRecording() async -> PermissionStatus {
-        do {
-            // SCShareableContent.current 在权限被拒绝时抛错（带特定 code）。
-            _ = try await SCShareableContent.current
-            return .granted
-        } catch {
-            // 任何错都视作未授予（更细分类不影响 UX）。
-            return .denied
-        }
+    /// 屏幕录制权限检测 — 用 Apple 推荐的 `CGPreflightScreenCaptureAccess()`，
+    /// 这是同步、不抛错、专门为权限预检设计的轻量 API（不会触发系统对话框）。
+    public static func screenRecording() -> PermissionStatus {
+        CGPreflightScreenCaptureAccess() ? .granted : .denied
+    }
+
+    /// 主动请求屏幕录制权限 — 触发 macOS 系统级对话框（如果当前 cdhash
+    /// 还没在 TCC 注册过）。返回值是用户**当下**的回应，不一定是最终结果，
+    /// 因为系统对话框关闭后用户可能跳到 System Settings 完成授权。
+    @discardableResult
+    public static func requestScreenRecording() -> PermissionStatus {
+        CGRequestScreenCaptureAccess() ? .granted : .denied
     }
 
     /// 唤起 macOS Settings 的「屏幕录制」面板。

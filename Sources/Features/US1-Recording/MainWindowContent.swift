@@ -88,7 +88,8 @@ struct MainWindowContentView: View {
                 PermissionCardView(
                     missing: missing,
                     onOpenSettings: { vm.openMissingPermissionSettings() },
-                    onDismiss:      { vm.dismissPermissionCard() }
+                    onDismiss:      { vm.dismissPermissionCard() },
+                    onRetry:        { vm.retryAfterPermissionGrant() }
                 )
                 .background(.ultraThinMaterial)
                 .transition(.opacity)

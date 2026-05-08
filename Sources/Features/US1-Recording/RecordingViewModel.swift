@@ -167,20 +167,59 @@ final class RecordingViewModel: ObservableObject {
         applyState(.idle)
     }
 
+    /// Called from "重新检测" — re-runs the preflight check + immediately
+    /// retries `startRecording` if the permission has flipped to granted.
+    func retryAfterPermissionGrant() {
+        let perm = Permissions.screenRecording()
+        if perm == .granted {
+            missingPermission = nil
+            toggleRecording()
+        } else {
+            // Still denied — keep the card visible; the user will most
+            // likely need to fully quit + relaunch the app for ad-hoc
+            // builds (the card's disclosure group explains this).
+            Task {
+                await Logger.shared.log(.permissionCheck, .info, [
+                    "permission": "screenRecording",
+                    "status": perm.rawValue,
+                    "phase": "user_retry"
+                ])
+            }
+        }
+    }
+
     // MARK: Private
 
     private func startRecording() async {
-        // 1. Permission gate
+        // 1. Permission gate (CGPreflight is sync, instant, no dialog).
         if fakePermissionDenied {
             applyState(.errorPermission(missing: .screenRecording))
             return
         }
-        let perm = await Permissions.screenRecording()
+        var perm = Permissions.screenRecording()
+        if perm != .granted {
+            // First try the OS-level request — this triggers macOS's native
+            // permission dialog (the very first time per cdhash) and *also*
+            // adds the app to System Settings → Privacy → Screen Recording
+            // so the user has a toggle to flip even if they dismiss it.
+            await Logger.shared.log(.permissionCheck, .info, [
+                "permission": "screenRecording",
+                "status": perm.rawValue,
+                "phase": "preflight_failed_will_request"
+            ])
+            _ = Permissions.requestScreenRecording()
+            // Re-check after the request — TCC sometimes flips immediately
+            // (e.g. user already granted previously and macOS just needed to
+            // be prodded), but more often a relaunch is required.
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            perm = Permissions.screenRecording()
+        }
         if perm != .granted {
             applyState(.errorPermission(missing: .screenRecording))
             await Logger.shared.log(.permissionCheck, .info, [
                 "permission": "screenRecording",
-                "status": perm.rawValue
+                "status": perm.rawValue,
+                "phase": "after_request"
             ])
             return
         }
