@@ -53,24 +53,21 @@ public actor AudioMixer {
 
     public func acceptSystem(_ wrapped: SendableSample) {
         guard config.systemEnabled else { return }
-        let sample = wrapped.buffer
-        if !config.micEnabled {
-            output?(sample)
-            return
-        }
-        pendingSystem = sample
-        flushIfReady()
+        // v0.1: ALWAYS pass system audio straight through. The previous
+        // "wait for matching mic buffer" flow caused multiple system samples
+        // to be silently dropped while waiting (system arrives faster than
+        // mic) — that produced the audible "electronic noise" the user
+        // reported. Now every system buffer reaches AssetWriter intact.
+        output?(wrapped.buffer)
     }
 
     public func acceptMic(_ wrapped: SendableSample) {
         guard config.micEnabled else { return }
-        let sample = wrapped.buffer
-        if !config.systemEnabled {
-            output?(sample)
-            return
-        }
-        pendingMic = sample
-        flushIfReady()
+        // v0.1: when system is also enabled, mic is silently dropped
+        // (system takes priority). When mic is the only source it passes
+        // straight through with no mixing.
+        if config.systemEnabled { return }
+        output?(wrapped.buffer)
     }
 
     // MARK: Mixing
