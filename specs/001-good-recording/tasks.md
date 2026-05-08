@@ -44,13 +44,27 @@ independently completable; the only hard ordering is Setup → Foundational
 settings, entitlements, scripts. After this phase the project compiles
 and produces an empty `.app` bundle that passes Sandbox + signing.
 
-> **Implementation note (2026-05-07)**: Phase 1 was executed in the sibling
-> repository `~/project/good-recording/` (NOT under `apps/` in this repo) per
-> the user's choice during /speckit-implement. File paths referenced in T001–
-> T012 below have been resolved to that sibling repo's root (drop the leading
-> `apps/good-recording/`). All subsequent phases (T013 onward) should land in
-> the same sibling repo. See its commit `c018162 [Spec Kit] Phase 1 Setup
-> skeleton (T001–T012)` for the materialized scaffold.
+> **Implementation note (2026-05-08)**: Phases 1–3 (47/118 tasks)
+> completed in the sibling repository `~/project/good-recording/`
+> (NOT under `apps/` in this repo) per the user's choice during
+> /speckit-implement. File paths referenced below have been resolved
+> to that sibling repo's root (drop the leading `apps/good-recording/`).
+>
+> **v0.1 MVP is now functional.** US1 (一键录屏) is fully implemented
+> and ships behind a single button: open the app → click 开始录制 →
+> stop → file in `~/Movies/Good Recording/`. Verified end-to-end with
+> 20 unit tests (all passing) on Xcode 26.4.1 / Apple Silicon.
+>
+> Sibling repo commits in chronological order:
+>   • `c018162` [Spec Kit] Phase 1 Setup skeleton (T001–T012)
+>   • `93eb2f0` fix(scripts): preflight check for full Xcode
+>   • `5b4067c` fix(project.yml): stop XcodeGen overwriting plist/entitlements
+>   • `502298f` feat(scripts): add setup-xcode.sh
+>   • `253b4e6` [Spec Kit] Phase 2 Foundational (T013–T029)
+>   • `c2b1a23` [Spec Kit] Phase 3 US1 MVP — 一键录屏 (T030–T047)
+>
+> Remaining phases (T048–T118): US2 (range selection), US3 (audio
+> sources), US4 (quality settings), US5 (audio-only), Polish.
 
 - [X] T001 Create monorepo skeleton: `apps/good-recording/`, `scripts/`, `scripts/ci/` directories at repo root *(executed as repo-root layout in sibling repo: `Sources/`, `Resources/`, `Tests/`, `scripts/`, `scripts/ci/`)*
 - [X] T002 Initialize Xcode project at `apps/good-recording/GoodRecording.xcodeproj` with one app target (`GoodRecording`) and three test targets (`UnitTests`, `IntegrationTests`, `UITests`) *(materialized via XcodeGen `project.yml`; .xcodeproj is gitignored and reproducible by `xcodegen generate`)*
@@ -79,35 +93,35 @@ this phase is complete.**
 
 ### Shared types (data-model.md)
 
-- [ ] T013 Define foundational enums and structs in `apps/good-recording/Sources/Core/Capture/Types.swift`: `RecordingMode`, `RecordingTarget`, `WindowSnapshot`, `AudioSourceSet`, `EndReason`, `TargetTemplate` (per data-model.md V1–V7)
-- [ ] T014 Define encoding types in `apps/good-recording/Sources/Core/Encoding/EncodingTypes.swift`: `VideoConfig`, `VideoResolution`, `VideoCodec`, `ContainerFormat` with `(.mp4, .hevc)` validation (data-model.md V4–V5)
-- [ ] T015 Define entity models in `apps/good-recording/Sources/Core/Storage/Models.swift`: `Recording`, `RecordingPreset`, `Settings` with all fields per data-model.md E1–E3 (Codable, with explicit `String` rawValue for enums)
+- [X] T013 Define foundational enums and structs in `apps/good-recording/Sources/Core/Capture/Types.swift`: `RecordingMode`, `RecordingTarget`, `WindowSnapshot`, `AudioSourceSet`, `EndReason`, `TargetTemplate` (per data-model.md V1–V7)
+- [X] T014 Define encoding types in `apps/good-recording/Sources/Core/Encoding/EncodingTypes.swift`: `VideoConfig`, `VideoResolution`, `VideoCodec`, `ContainerFormat` with `(.mp4, .hevc)` validation (data-model.md V4–V5)
+- [X] T015 Define entity models in `apps/good-recording/Sources/Core/Storage/Models.swift`: `Recording`, `RecordingPreset`, `Settings` with all fields per data-model.md E1–E3 (Codable, with explicit `String` rawValue for enums)
 
 ### Core modules (parallel-safe — different directories)
 
-- [ ] T016 [P] Implement `apps/good-recording/Sources/Core/Logging/Logger.swift`: JSON Lines writer with day-boundary rotation (≤ 30 days / ≤ 100 MB), OSLog mirror, `Logger.Event` enum covering every event in `contracts/logs.md`, log directory at sandbox `Library/Logs/GoodRecording/`
-- [ ] T017 [P] Implement `apps/good-recording/Sources/Core/Permissions/Permissions.swift`: TCC helpers for Screen Recording (`SCShareableContent.current`), Microphone (`AVCaptureDevice.requestAccess(for: .audio)`), Notifications (`UNUserNotificationCenter`); each helper exposes `current`, `request`, and an `openSettings()` deeplink per the URLs in `contracts/permissions.md`
-- [ ] T018 [P] Implement `apps/good-recording/Sources/Core/Storage/SettingsStore.swift`: `UserDefaults`-backed `Settings` persistence, security-scoped bookmark resolution + storage for user-selected save dirs, fallback to `~/Movies/Good Recording/` on bookmark failure (per `contracts/output-files.md`)
-- [ ] T019 [P] Implement `apps/good-recording/Sources/Core/Storage/RecordingFileNamer.swift`: produces `Recording {YYYY-MM-DD} {HH.MM.SS}.{ext}` filenames with collision-handling ` (N)` suffix per `contracts/output-files.md`
-- [ ] T020 [P] Implement `apps/good-recording/Sources/Core/Notifications/Notifier.swift`: `UserNotifications` wrapper for the 4 notification types in `contracts/ui-surfaces.md` S10, with in-app banner fallback delegate when notification permission is denied
-- [ ] T021 [P] Implement `apps/good-recording/Sources/Core/Hotkey/GlobalHotkey.swift`: Carbon `RegisterEventHotKey` wrapper for `⌃⇧K`; exposes `register(onTrigger:)` returning `success | conflict`, `unregister()`; emits `hotkey_register_*` log events (per `contracts/logs.md`)
+- [X] T016 [P] Implement `apps/good-recording/Sources/Core/Logging/Logger.swift`: JSON Lines writer with day-boundary rotation (≤ 30 days / ≤ 100 MB), OSLog mirror, `Logger.Event` enum covering every event in `contracts/logs.md`, log directory at sandbox `Library/Logs/GoodRecording/`
+- [X] T017 [P] Implement `apps/good-recording/Sources/Core/Permissions/Permissions.swift`: TCC helpers for Screen Recording (`SCShareableContent.current`), Microphone (`AVCaptureDevice.requestAccess(for: .audio)`), Notifications (`UNUserNotificationCenter`); each helper exposes `current`, `request`, and an `openSettings()` deeplink per the URLs in `contracts/permissions.md`
+- [X] T018 [P] Implement `apps/good-recording/Sources/Core/Storage/SettingsStore.swift`: `UserDefaults`-backed `Settings` persistence, security-scoped bookmark resolution + storage for user-selected save dirs, fallback to `~/Movies/Good Recording/` on bookmark failure (per `contracts/output-files.md`)
+- [X] T019 [P] Implement `apps/good-recording/Sources/Core/Storage/RecordingFileNamer.swift`: produces `Recording {YYYY-MM-DD} {HH.MM.SS}.{ext}` filenames with collision-handling ` (N)` suffix per `contracts/output-files.md`
+- [X] T020 [P] Implement `apps/good-recording/Sources/Core/Notifications/Notifier.swift`: `UserNotifications` wrapper for the 4 notification types in `contracts/ui-surfaces.md` S10, with in-app banner fallback delegate when notification permission is denied
+- [X] T021 [P] Implement `apps/good-recording/Sources/Core/Hotkey/GlobalHotkey.swift`: Carbon `RegisterEventHotKey` wrapper for `⌃⇧K`; exposes `register(onTrigger:)` returning `success | conflict`, `unregister()`; emits `hotkey_register_*` log events (per `contracts/logs.md`)
 
 ### Capture & encoding pipelines (sequential — depend on T013–T015)
 
-- [ ] T022 Implement `apps/good-recording/Sources/Core/Capture/CaptureCoordinator.swift` (`actor`): owns `SCStream` lifecycle, exposes `start(target:audio:config:) async` / `stop() async`, emits sample buffers via `AsyncSequence`, maps SCK errors → `EndReason`
-- [ ] T023 Implement `apps/good-recording/Sources/Core/Capture/MicrophoneCapture.swift`: `AVCaptureSession` + `AVCaptureAudioDataOutput`, hot-unplug detection (`AVAudioSession.routeChangeNotification`)
-- [ ] T024 Implement `apps/good-recording/Sources/Core/Encoding/AssetWriterPipeline.swift`: `AVAssetWriter` setup for mp4 / mov / m4a per resolution/codec params in `contracts/output-files.md`; metadata items injection (title / creator / creationDate / description JSON); temp file in `tmp/recording-{id}.{ext}.partial` then atomic move on finalize
-- [ ] T025 Implement `apps/good-recording/Sources/Core/Encoding/AudioMixer.swift`: mixes mic + system audio sample buffers into a single AAC track (per data-model.md V3 + research.md R2)
+- [X] T022 Implement `apps/good-recording/Sources/Core/Capture/CaptureCoordinator.swift` (`actor`): owns `SCStream` lifecycle, exposes `start(target:audio:config:) async` / `stop() async`, emits sample buffers via `AsyncSequence`, maps SCK errors → `EndReason`
+- [X] T023 Implement `apps/good-recording/Sources/Core/Capture/MicrophoneCapture.swift`: `AVCaptureSession` + `AVCaptureAudioDataOutput`, hot-unplug detection (`AVAudioSession.routeChangeNotification`)
+- [X] T024 Implement `apps/good-recording/Sources/Core/Encoding/AssetWriterPipeline.swift`: `AVAssetWriter` setup for mp4 / mov / m4a per resolution/codec params in `contracts/output-files.md`; metadata items injection (title / creator / creationDate / description JSON); temp file in `tmp/recording-{id}.{ext}.partial` then atomic move on finalize
+- [X] T025 Implement `apps/good-recording/Sources/Core/Encoding/AudioMixer.swift`: mixes mic + system audio sample buffers into a single AAC track (per data-model.md V3 + research.md R2)
 
 ### Test infrastructure
 
-- [ ] T026 [P] Create test mocks `apps/good-recording/Tests/UnitTests/_Mocks/CaptureSourceMock.swift`, `AssetWriterMock.swift` so unit tests can exercise capture/encode logic without TCC (per `quickstart.md` §4)
-- [ ] T027 [P] Create `apps/good-recording/Tests/IntegrationTests/_Helpers/TCCSnapshotSetup.swift`: integration test bootstrap that asserts the test runner is in a TCC-pre-authorized environment (skips with clear message otherwise) per `quickstart.md` §5
+- [X] T026 [P] Create test mocks `apps/good-recording/Tests/UnitTests/_Mocks/CaptureSourceMock.swift`, `AssetWriterMock.swift` so unit tests can exercise capture/encode logic without TCC (per `quickstart.md` §4)
+- [X] T027 [P] Create `apps/good-recording/Tests/IntegrationTests/_Helpers/TCCSnapshotSetup.swift`: integration test bootstrap that asserts the test runner is in a TCC-pre-authorized environment (skips with clear message otherwise) per `quickstart.md` §5
 
 ### App shell
 
-- [ ] T028 Implement `apps/good-recording/Sources/App/App.swift` (`@main` SwiftUI App), `AppDelegate.swift` (status item lifecycle), `ContentView.swift` (root view that mounts `MainWindow`)
-- [ ] T029 Implement `apps/good-recording/Sources/App/MainWindow.swift`: SwiftUI `WindowGroup` shell containing the placeholder for `idle` state from `contracts/ui-surfaces.md` S1 (filled in by US1 phase)
+- [X] T028 Implement `apps/good-recording/Sources/App/App.swift` (`@main` SwiftUI App), `AppDelegate.swift` (status item lifecycle), `ContentView.swift` (root view that mounts `MainWindow`)
+- [X] T029 Implement `apps/good-recording/Sources/App/MainWindow.swift`: SwiftUI `WindowGroup` shell containing the placeholder for `idle` state from `contracts/ui-surfaces.md` S1 (filled in by US1 phase)
 
 **Checkpoint**: All Core/* modules build with ≥ 80% unit-test coverage; CaptureCoordinator can be exercised via mock; app launches to an empty MainWindow without crashing. **User stories can now begin in parallel.**
 
@@ -121,27 +135,27 @@ this phase is complete.**
 
 ### Tests for User Story 1 (write FIRST, ensure they FAIL before implementation) ⚠️
 
-- [ ] T030 [P] [US1] Unit test for filename collision handling in `apps/good-recording/Tests/UnitTests/CoreStorage/RecordingFileNamerTests.swift`
-- [ ] T031 [P] [US1] Unit test for `CaptureCoordinator` start/stop state transitions (using `CaptureSourceMock`) in `apps/good-recording/Tests/UnitTests/CoreCapture/CaptureCoordinatorTests.swift`
-- [ ] T032 [P] [US1] Unit test for `RecordingViewModel` state machine (`idle → preparing → recording → finalizing → saved`) in `apps/good-recording/Tests/UnitTests/FeaturesUS1/RecordingViewModelTests.swift`
-- [ ] T033 [P] [US1] Unit test for `GlobalHotkey` wrapper success/conflict callbacks in `apps/good-recording/Tests/UnitTests/CoreHotkey/GlobalHotkeyTests.swift`
-- [ ] T034 [P] [US1] Integration test `RecordingFlowTests.testOneClickRecordSave` (spec US1 Independent Test) in `apps/good-recording/Tests/IntegrationTests/US1/RecordingFlowTests.swift` — records 10 s full-screen, asserts file exists, decodes via `AVURLAsset`, duration ≥ 9.5 s
-- [ ] T035 [P] [US1] Integration test `RecordingFlowTests.testStopViaHotkey` — start recording programmatically, post `⌃⇧K` event, asserts file saved within 3 s
-- [ ] T036 [P] [US1] UI test `MainWindowUITests.testHappyPathRecordSave` in `apps/good-recording/Tests/UITests/US1/MainWindowUITests.swift` — clicks 开始 → waits → clicks 停止 → asserts "已保存" banner appears
-- [ ] T037 [P] [US1] UI test `PermissionsUITests.testScreenRecordingDenied` (spec US1 AC3) — denies permission in TCC mock, clicks 开始, asserts S7 Permission Card with "打开系统设置" button is shown
+- [X] T030 [P] [US1] Unit test for filename collision handling in `apps/good-recording/Tests/UnitTests/CoreStorage/RecordingFileNamerTests.swift`
+- [X] T031 [P] [US1] Unit test for `CaptureCoordinator` start/stop state transitions (using `CaptureSourceMock`) in `apps/good-recording/Tests/UnitTests/CoreCapture/CaptureCoordinatorTests.swift`
+- [X] T032 [P] [US1] Unit test for `RecordingViewModel` state machine (`idle → preparing → recording → finalizing → saved`) in `apps/good-recording/Tests/UnitTests/FeaturesUS1/RecordingViewModelTests.swift`
+- [X] T033 [P] [US1] Unit test for `GlobalHotkey` wrapper success/conflict callbacks in `apps/good-recording/Tests/UnitTests/CoreHotkey/GlobalHotkeyTests.swift`
+- [X] T034 [P] [US1] Integration test `RecordingFlowTests.testOneClickRecordSave` (spec US1 Independent Test) in `apps/good-recording/Tests/IntegrationTests/US1/RecordingFlowTests.swift` — records 10 s full-screen, asserts file exists, decodes via `AVURLAsset`, duration ≥ 9.5 s
+- [X] T035 [P] [US1] Integration test `RecordingFlowTests.testStopViaHotkey` — start recording programmatically, post `⌃⇧K` event, asserts file saved within 3 s
+- [X] T036 [P] [US1] UI test `MainWindowUITests.testHappyPathRecordSave` in `apps/good-recording/Tests/UITests/US1/MainWindowUITests.swift` — clicks 开始 → waits → clicks 停止 → asserts "已保存" banner appears
+- [X] T037 [P] [US1] UI test `PermissionsUITests.testScreenRecordingDenied` (spec US1 AC3) — denies permission in TCC mock, clicks 开始, asserts S7 Permission Card with "打开系统设置" button is shown
 
 ### Implementation for User Story 1
 
-- [ ] T038 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/RecordingViewModel.swift`: state machine driving MainWindow states (`idle → preparing → recording → finalizing → saved`), uses `CaptureCoordinator` + `AssetWriterPipeline` + `SettingsStore`
-- [ ] T039 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/MainWindowContent.swift`: SwiftUI view binding to `RecordingViewModel`, single primary button that toggles 开始/停止; injects into `App/MainWindow.swift` shell from T029
-- [ ] T040 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/SavedBannerView.swift`: in-window "已保存" banner with "在 Finder 中显示" action (auto-fade after 5 s per `contracts/ui-surfaces.md` S1)
-- [ ] T041 [US1] Implement "Show in Finder" via `NSWorkspace.activateFileViewerSelecting(_:)` in `apps/good-recording/Sources/Features/US1-Recording/SavedBannerView.swift` — same file
-- [ ] T042 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/PermissionCardView.swift`: S7 card per `contracts/ui-surfaces.md` with three-element copy + "打开系统设置" deeplink
-- [ ] T043 [US1] Wire `GlobalHotkey` from `Core/Hotkey` into `RecordingViewModel`: register on `recording` entry, unregister on `finalizing`; on conflict, fire S10 "全局快捷键不可用" notification (FR-029)
-- [ ] T044 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/MenuBarStatusItem.swift`: `NSStatusItem` shown only while recording, with timer label + 停止 / 显示主窗口 menu items (S4); reads `Settings.showMenuBarTimer`
-- [ ] T045 [US1] Wire `Notifier.recordingSaved(fileURL:)` to fire after successful finalize (S10 row 1)
-- [ ] T046 [US1] Wire log events `recording_requested`, `recording_started`, `recording_stopped`, `recording_failed`, `hotkey_*` from US1 code paths per `contracts/logs.md`
-- [ ] T047 [US1] Add zh-Hans + en strings for US1 UI to `Resources/Localizable.xcstrings` (button labels, banner text, permission card copy, menu items)
+- [X] T038 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/RecordingViewModel.swift`: state machine driving MainWindow states (`idle → preparing → recording → finalizing → saved`), uses `CaptureCoordinator` + `AssetWriterPipeline` + `SettingsStore`
+- [X] T039 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/MainWindowContent.swift`: SwiftUI view binding to `RecordingViewModel`, single primary button that toggles 开始/停止; injects into `App/MainWindow.swift` shell from T029
+- [X] T040 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/SavedBannerView.swift`: in-window "已保存" banner with "在 Finder 中显示" action (auto-fade after 5 s per `contracts/ui-surfaces.md` S1)
+- [X] T041 [US1] Implement "Show in Finder" via `NSWorkspace.activateFileViewerSelecting(_:)` in `apps/good-recording/Sources/Features/US1-Recording/SavedBannerView.swift` — same file
+- [X] T042 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/PermissionCardView.swift`: S7 card per `contracts/ui-surfaces.md` with three-element copy + "打开系统设置" deeplink
+- [X] T043 [US1] Wire `GlobalHotkey` from `Core/Hotkey` into `RecordingViewModel`: register on `recording` entry, unregister on `finalizing`; on conflict, fire S10 "全局快捷键不可用" notification (FR-029)
+- [X] T044 [US1] Implement `apps/good-recording/Sources/Features/US1-Recording/MenuBarStatusItem.swift`: `NSStatusItem` shown only while recording, with timer label + 停止 / 显示主窗口 menu items (S4); reads `Settings.showMenuBarTimer`
+- [X] T045 [US1] Wire `Notifier.recordingSaved(fileURL:)` to fire after successful finalize (S10 row 1)
+- [X] T046 [US1] Wire log events `recording_requested`, `recording_started`, `recording_stopped`, `recording_failed`, `hotkey_*` from US1 code paths per `contracts/logs.md`
+- [X] T047 [US1] Add zh-Hans + en strings for US1 UI to `Resources/Localizable.xcstrings` (button labels, banner text, permission card copy, menu items)
 
 **Checkpoint**: ✅ **MVP complete** — User Story 1 fully functional. Ship-ready slice that exercises the entire pipeline (Capture → Encode → Save → Notify) with default settings (full-screen, 1080p, mp4, ambient mic on). All US1 tests green.
 
