@@ -19,7 +19,6 @@ settings:
     SWIFT_STRICT_CONCURRENCY: complete
     ARCHS: "arm64 x86_64"
     ONLY_ACTIVE_ARCH: NO
-    ENABLE_HARDENED_RUNTIME: YES
     ENABLE_APP_SANDBOX: YES
     PRODUCT_BUNDLE_IDENTIFIER: com.zzming.good-recording
     MARKETING_VERSION: "1.0.0"
@@ -33,6 +32,18 @@ settings:
     DEAD_CODE_STRIPPING: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
+  configs:
+    # Debug builds use a self-signed local cert which has no Apple Team
+    # Identifier. macOS 26's dyld refuses to load .debug.dylib companions
+    # under Hardened Runtime when team IDs are "not set" on both the main
+    # binary and the dylib (it strictly treats "none == none" as
+    # mismatch). So Debug builds run without Hardened Runtime; Release
+    # builds (which would be Apple Developer ID signed for distribution)
+    # keep it enabled per Constitution IV.
+    Debug:
+      ENABLE_HARDENED_RUNTIME: NO
+    Release:
+      ENABLE_HARDENED_RUNTIME: YES
 
 targets:
   GoodRecording:
