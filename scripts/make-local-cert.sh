@@ -21,6 +21,11 @@ set -euo pipefail
 
 CERT_NAME="GoodRecording Local Dev"
 CERT_KEYCHAIN="$HOME/Library/Keychains/login.keychain-db"
+# Resolve REPO_ROOT BEFORE we cd into the scratch dir + set the trap
+# (otherwise the trap deletes the scratch dir and `cd back` later
+# resolves dirname against a non-existent cwd → "No such file or
+# directory" at the auto-build step).
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TMP_DIR"' EXIT
 
@@ -96,8 +101,25 @@ security import cert.p12 -k "$CERT_KEYCHAIN" -P "$P12_PASS" \
     2>&1 | sed 's/^/  /'
 
 echo ""
-echo "→ Step 3/5: Granting codesign permission to access the private key without prompting"
-security set-key-partition-list -S apple-tool:,apple: -s -k "" "$CERT_KEYCHAIN" 2>/dev/null || true
+echo "→ Step 3/5: Granting codesign permission to access the private key"
+echo "  (You'll be prompted for your macOS login password — this is the"
+echo "   same password as your login keychain. Without it, codesign will"
+echo "   fail with errSecInternalComponent on every build.)"
+echo ""
+KEYCHAIN_PWD=""
+printf "  macOS 登录密码: "
+stty -echo
+read KEYCHAIN_PWD
+stty echo
+echo ""
+security unlock-keychain -p "$KEYCHAIN_PWD" "$CERT_KEYCHAIN" >/dev/null 2>&1 \
+    || { echo "  ❌ Keychain unlock failed — wrong password. Re-run the script." >&2; exit 1; }
+security set-key-partition-list \
+    -S apple-tool:,apple:,codesign:,unsigned: \
+    -s -k "$KEYCHAIN_PWD" "$CERT_KEYCHAIN" >/dev/null 2>&1 \
+    || { echo "  ❌ set-key-partition-list failed." >&2; exit 1; }
+unset KEYCHAIN_PWD
+echo "  ✅ Codesign granted private-key access"
 
 echo ""
 echo "→ Step 4/5: Trusting the certificate as a code-signing root"
