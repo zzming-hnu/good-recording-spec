@@ -123,11 +123,24 @@ if [[ "$SIGNER" != *"GoodRecording Local Dev"* && "$SIGNER" != *"Apple Developme
     exit 1
 fi
 
-# ─── Step 4: TCC reset + cfprefsd reset ────────────────────────────
+# ─── Step 4: TCC reset + UserDefaults cleanup + cfprefsd reset ─────
 echo ""
-echo "→ Step 4/5: clearing TCC grant for $BUNDLE_ID + cfprefsd cache"
+echo "→ Step 4/5: clearing TCC + sandbox UserDefaults + cfprefsd cache"
 tccutil reset ScreenCapture "$BUNDLE_ID" 2>&1 | sed 's/^/  /'
 tccutil reset Microphone   "$BUNDLE_ID" 2>&1 | sed 's/^/  /'
+
+# Clear stale sandbox UserDefaults entries that may carry forward old
+# preset values (e.g. .sysOnly from an older quick-fix). `defaults
+# delete` doesn't work for sandboxed apps because it targets the
+# user-domain plist, not the sandbox container — so we reach into the
+# container plist directly.
+SANDBOX_PLIST="$HOME/Library/Containers/$BUNDLE_ID/Data/Library/Preferences/$BUNDLE_ID.plist"
+if [[ -f "$SANDBOX_PLIST" ]]; then
+    /usr/libexec/PlistBuddy -c "Delete :good.recording.preset.lastUsed.v1" "$SANDBOX_PLIST" 2>/dev/null || true
+    /usr/libexec/PlistBuddy -c "Delete :good.recording.settings.v1"        "$SANDBOX_PLIST" 2>/dev/null || true
+    echo "  ✅ Sandbox UserDefaults cleared (preset + settings)"
+fi
+
 killall -u "$USER" cfprefsd 2>/dev/null || true
 sleep 1
 echo "  ✅ TCC + cfprefsd reset (next launch will show native dialog)"
