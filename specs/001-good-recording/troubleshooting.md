@@ -366,6 +366,65 @@ on signal. Direct kills bounce.
 
 ---
 
+## Issue 12 — App has no icon, no localization, and weird TCC behavior all at once
+
+**Symptom**: Built `.app` shows the placeholder generic icon (not your
+custom one), `Text("App.Title")` displays the literal key string
+instead of the localized text, AND TCC behaves more flakily than
+should be expected with a properly-signed app.
+
+**Root cause**: XcodeGen has **no `resources:` field** at the target
+level. We mistakenly used:
+
+```yaml
+targets:
+  GoodRecording:
+    sources:
+      - path: Sources/App
+    resources:                              # ← XcodeGen ignores this
+      - path: Resources/Assets.xcassets
+      - path: Resources/Localizable.xcstrings
+```
+
+XcodeGen silently ignored the `resources:` block, so the generated
+`.xcodeproj` had **zero `PBXResourcesBuildPhase`** entries. As a
+result, `xcodebuild build` produced a `.app` with **no `Contents/Resources/`
+directory at all** — no `AppIcon.icns`, no `Assets.car`, no `.lproj/`,
+nothing. Build settings like `ASSETCATALOG_COMPILER_APPICON_NAME` were
+present but harmless because there was no asset catalog to compile.
+
+The "weird TCC behavior" probably also traces here: even though the
+entitlements file was named in `CODE_SIGN_ENTITLEMENTS`, certain
+runtime checks Apple does may inspect bundle Resources for sanity.
+
+**Fix**: drop `resources:`. Put asset catalogs and string catalogs
+directly in `sources:` — XcodeGen auto-detects them by extension:
+
+```yaml
+targets:
+  GoodRecording:
+    sources:
+      - path: Sources/App
+      - path: Sources/Features
+      - path: Sources/Core
+      - path: Resources/Assets.xcassets
+      - path: Resources/Localizable.xcstrings
+```
+
+After regenerating + clean rebuilding, `.app/Contents/Resources/`
+will contain `AppIcon.icns`, `Assets.car`, `en.lproj/`, `zh-Hans.lproj/`.
+
+**How to detect this regression in the future**:
+
+```bash
+APP=$(find ~/Library/Developer/Xcode/DerivedData/GoodRecording-*/Build/Products/Debug \
+        -maxdepth 2 -name 'GoodRecording.app' | head -1)
+ls -la "$APP/Contents/Resources/" || echo "❌ no Resources/ — XcodeGen broken"
+```
+
+CI could be tightened to fail if the app bundle has no Resources/
+or no AppIcon.icns.
+
 ## How to gather diagnostics when something else breaks
 
 ```bash

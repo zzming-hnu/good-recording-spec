@@ -55,7 +55,11 @@ targets:
       - path: Sources/App
       - path: Sources/Features
       - path: Sources/Core
-    resources:
+      # XcodeGen has no separate `resources:` field — assets and string
+      # catalogs go in `sources:` and are auto-detected by extension.
+      # (Earlier we put these under `resources:` and XcodeGen silently
+      # ignored them, so the .app was being built without Resources/ at
+      # all → no app icon, no localization, no entitlements processing.)
       - path: Resources/Assets.xcassets
       - path: Resources/Localizable.xcstrings
     settings:
