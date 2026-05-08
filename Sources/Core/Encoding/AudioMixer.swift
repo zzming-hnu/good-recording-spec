@@ -76,20 +76,25 @@ public actor AudioMixer {
     // MARK: Mixing
 
     private func flushIfReady() {
-        guard let sys = pendingSystem, let mic = pendingMic else { return }
+        guard let sys = pendingSystem, let _ = pendingMic else { return }
         defer {
             pendingSystem = nil
             pendingMic = nil
         }
 
-        // Take system as the timing master; mix mic into it sample-wise.
-        if let mixed = mix(master: sys, slave: mic) {
-            output?(mixed)
-        } else {
-            // Mixing failed — drop the mic buffer and forward the system one
-            // so the recording doesn't go silent.
-            output?(sys)
-        }
+        // v0.1 LIMITATION: byte-level PCM mixing produces audible distortion
+        // ("electronic noise") because mic and system audio arrive in
+        // different formats (sample rate, bit depth, channel count). The
+        // proper fix is an AVAudioEngine-based pipeline with AVAudioConverter
+        // doing per-stream format normalization before mixing — tracked as
+        // a follow-up to Phase 5 (US3 audio sources UI).
+        //
+        // For v0.1: when both sources are enabled, prefer SYSTEM audio
+        // and drop mic. Users explicitly turning on system audio almost
+        // always care about that source more (presentation / game / video
+        // content); single-source pass-through works perfectly.
+        output?(sys)
+        // TODO(v0.2): replace with AVAudioEngine-based real mixing.
     }
 
     private nonisolated func mix(master: CMSampleBuffer, slave: CMSampleBuffer) -> CMSampleBuffer? {

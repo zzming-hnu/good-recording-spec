@@ -98,14 +98,24 @@ public struct RecordingPreset: Sendable, Codable, Equatable {
     public static let lastUsedName = "_lastUsed"
 
     /// 工厂 — 出厂默认值。
-    /// v1 阶段：默认同时录 mic + system，让用户开箱即得"教学视频/会议录制"
-    /// 最常见的双轨场景。Phase 5 (US3) 会引入独立 toggle UI 后，这个
-    /// 默认值可以回归到 spec 推荐的 `.micOnly`（隐私最小化）。
+    ///
+    /// v0.1 阶段：默认 .sysOnly（只录系统音，不录 mic）。原因：
+    ///   - AudioMixer 的真混音（mic + system 同时进单条音轨）在 v0.1 还没
+    ///     做对（byte-level PCM 加和会产生 "电音" 失真），见 AudioMixer.swift
+    ///     的 v0.1 LIMITATION 注释。
+    ///   - 因此当两路都开启时 quick-fix 只输出 system 音，mic 会被 silent
+    ///     drop —— 那就不如直接默认就只录 system，UX 上更诚实。
+    ///   - 对 v0.1 最常见的"录教学视频 / 录游戏 / 录会议屏幕"诉求，
+    ///     系统音通常是用户最在意的那一路。
+    ///
+    /// v0.2 计划：替换 AudioMixer 为基于 AVAudioEngine 的真混音管线，
+    /// 然后这里改回 .both（mic + system 都录）或回到 spec 推荐的 .micOnly
+    /// （取决于产品决策）。
     public static let factoryDefault = RecordingPreset(
         name: lastUsedName,
         mode: .video,
         target: .default,
-        audioSources: .both,
+        audioSources: .sysOnly,
         videoConfig: .default
     )
 
