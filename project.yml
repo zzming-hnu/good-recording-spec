@@ -34,16 +34,24 @@ settings:
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
   configs:
     # Debug builds use a self-signed local cert which has no Apple Team
-    # Identifier. macOS 26's dyld refuses to load .debug.dylib companions
-    # under Hardened Runtime when team IDs are "not set" on both the main
-    # binary and the dylib (it strictly treats "none == none" as
-    # mismatch). So Debug builds run without Hardened Runtime; Release
-    # builds (which would be Apple Developer ID signed for distribution)
-    # keep it enabled per Constitution IV.
+    # Identifier. Two Xcode-16-era escape hatches needed:
+    #   1. ENABLE_HARDENED_RUNTIME = NO — dyld under Hardened Runtime
+    #      treats team_id="not set" on both main binary and companion
+    #      dylib as a mismatch, refusing to load.
+    #   2. ENABLE_DEBUG_DYLIB = NO — Xcode 16 by default splits the
+    #      Swift portion into a separate .debug.dylib for faster
+    #      incremental builds. That dylib has its own (cdhash-only)
+    #      identity and breaks under self-signed identities. Disabling
+    #      it makes Xcode produce the traditional monolithic binary,
+    #      eliminating the dyld load problem entirely.
+    # Release builds (Apple Developer ID signed for distribution) keep
+    # both YES per Constitution IV.
     Debug:
       ENABLE_HARDENED_RUNTIME: NO
+      ENABLE_DEBUG_DYLIB: NO
     Release:
       ENABLE_HARDENED_RUNTIME: YES
+      ENABLE_DEBUG_DYLIB: NO
 
 targets:
   GoodRecording:
