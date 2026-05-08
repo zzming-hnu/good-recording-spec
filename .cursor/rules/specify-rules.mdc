@@ -13,5 +13,42 @@ shell commands, and other important information, read the current plan:
 - Data model: [specs/001-good-recording/data-model.md](mdc:specs/001-good-recording/data-model.md)
 - Contracts: [specs/001-good-recording/contracts/](mdc:specs/001-good-recording/contracts)
 - Quickstart: [specs/001-good-recording/quickstart.md](mdc:specs/001-good-recording/quickstart.md)
+- Troubleshooting: [specs/001-good-recording/troubleshooting.md](mdc:specs/001-good-recording/troubleshooting.md) (11 known macOS dev environment issues with fixes)
+- Tasks: [specs/001-good-recording/tasks.md](mdc:specs/001-good-recording/tasks.md) (47/118 done — Phases 1–3 ✅)
 - Constitution: [.specify/memory/constitution.md](mdc:.specify/memory/constitution.md) (v1.0.0)
 <!-- SPECKIT END -->
+
+## Implementation lives in a SIBLING repository
+
+The Swift implementation of feature `001-good-recording` lives at
+`/Users/zzming/project/good-recording/` (NOT under `apps/` here, by
+explicit user choice during /speckit-implement). When asked to
+modify implementation code, scripts (build / sign / make-cert /
+rebuild-and-reauth), or `project.yml`, work in that sibling repo.
+
+Key implementation files (all under `~/project/good-recording/`):
+
+- `project.yml` — XcodeGen source of truth (do NOT use `info:` /
+  `entitlements:` keys; see troubleshooting Issue 2)
+- `Sources/App/{App,AppDelegate,FeatureFlags,MainWindow}.swift`
+- `Sources/Features/US1-Recording/` — done (T030–T047)
+- `Sources/Features/US2-ScopeSelection/` — pending (T048–T063)
+- `Sources/Features/US3-AudioSources/` — pending (T064–T079)
+- `Sources/Features/US4-QualitySettings/` — pending (T080–T093)
+- `Sources/Features/US5-AudioOnlyMode/` — pending (T094–T103)
+- `Sources/Core/{Capture,Encoding,Storage,Permissions,Hotkey,Notifications,Logging}/` — Phase 2
+- `Tests/{Unit,Integration,UI}Tests/`
+- `scripts/{setup-xcode,make-local-cert,build-universal,sign-and-notarize,rebuild-and-reauth}.sh`
+- `scripts/ci/{check-entitlements,check-no-network,check-strings,check-logs-contract,xc-dependency-lint}.sh`
+
+Sibling repo has its own `.cursor/rules/spec-context.mdc` that
+mirrors back to the spec files here, so opening cursor in either
+workspace gives full bidirectional context.
+
+## Live v0.1 known limitation
+
+`AudioMixer.useEnginePath = false` — v0.2 AVAudioEngine real-mix
+path is written but has an unsolved buffer-drop issue. Default
+preset is `.sysOnly` until v0.2 mixer is fixed (see
+`Sources/Core/Encoding/AudioMixer.swift` "KNOWN ISSUE" comment in
+the sibling repo).
