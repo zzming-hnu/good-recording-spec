@@ -19,10 +19,18 @@ public actor AssetWriterPipeline {
 
     // MARK: Public types
 
-    public enum PipelineError: Error, Sendable {
+    public enum PipelineError: LocalizedError, Sendable {
         case writerSetupFailed(String)
         case finishFailed(String)
         case validationFailed(String)
+
+        public var errorDescription: String? {
+            switch self {
+            case .writerSetupFailed(let m): return "Writer setup failed: \(m)"
+            case .finishFailed(let m):      return "Finish failed: \(m)"
+            case .validationFailed(let m):  return "Validation failed: \(m)"
+            }
+        }
     }
 
     public struct Config: Sendable {
@@ -181,6 +189,11 @@ public actor AssetWriterPipeline {
     }
 
     /// 结束 — 标记 inputs done、await finish、原子改名、校验、返回最终 URL + 大小。
+    ///
+    /// Order matters: we move tmp → final FIRST, *then* run acceptance gate
+    /// on the final URL. If we ran the gate on the `.partial` URL instead,
+    /// AVURLAsset's type sniffing rejects the unknown extension and reports
+    /// zero tracks even on a perfectly good file.
     public func finishWriting() async throws -> (fileURL: URL, sizeBytes: Int64) {
         guard let writer = writer else {
             throw PipelineError.finishFailed("writer was never started")
@@ -199,23 +212,9 @@ public actor AssetWriterPipeline {
             )
         }
 
-        // Validate (contracts/output-files.md "Acceptance contract")
-        let asset = AVURLAsset(url: tempURL)
-        let tracks = (try? await asset.load(.tracks)) ?? []
-        let duration = (try? await asset.load(.duration).seconds) ?? 0
-        let fileSize = (try? FileManager.default.attributesOfItem(atPath: tempURL.path)[.size] as? Int) ?? 0
-        guard !tracks.isEmpty,
-              duration >= 0.5,
-              fileSize > 0 else {
-            // Quarantine
-            let quarantineDir = config.saveDirectoryURL.appendingPathComponent("_failed", isDirectory: true)
-            try? FileManager.default.createDirectory(at: quarantineDir, withIntermediateDirectories: true)
-            let quarantineURL = quarantineDir.appendingPathComponent("\(config.recordingID.uuidString).\(config.containerFormat.fileExtension)")
-            _ = try? FileManager.default.replaceItemAt(quarantineURL, withItemAt: tempURL)
-            throw PipelineError.validationFailed("acceptance gate failed (tracks=\(tracks.count), dur=\(duration), size=\(fileSize))")
-        }
-
-        // Atomic move tmp → final.
+        // 1) Atomic move tmp → final. Doing this first means the acceptance
+        //    gate below uses a URL that AVFoundation actually recognises by
+        //    extension (.mp4 / .mov / .m4a).
         try FileManager.default.createDirectory(
             at: config.saveDirectoryURL,
             withIntermediateDirectories: true
@@ -225,8 +224,23 @@ public actor AssetWriterPipeline {
         }
         try FileManager.default.moveItem(at: tempURL, to: config.finalFileURL)
 
-        let finalSize = (try? FileManager.default.attributesOfItem(atPath: config.finalFileURL.path)[.size] as? Int) ?? fileSize
-        return (config.finalFileURL, Int64(finalSize))
+        // 2) Acceptance contract (contracts/output-files.md) on the final URL.
+        let asset = AVURLAsset(url: config.finalFileURL)
+        let tracks = (try? await asset.load(.tracks)) ?? []
+        let duration = (try? await asset.load(.duration).seconds) ?? 0
+        let fileSize = (try? FileManager.default.attributesOfItem(atPath: config.finalFileURL.path)[.size] as? Int) ?? 0
+        guard !tracks.isEmpty,
+              duration >= 0.5,
+              fileSize > 0 else {
+            // Quarantine the moved file so the user can still recover it.
+            let quarantineDir = config.saveDirectoryURL.appendingPathComponent("_failed", isDirectory: true)
+            try? FileManager.default.createDirectory(at: quarantineDir, withIntermediateDirectories: true)
+            let quarantineURL = quarantineDir.appendingPathComponent("\(config.recordingID.uuidString).\(config.containerFormat.fileExtension)")
+            try? FileManager.default.moveItem(at: config.finalFileURL, to: quarantineURL)
+            throw PipelineError.validationFailed("acceptance gate failed (tracks=\(tracks.count), dur=\(duration), size=\(fileSize))")
+        }
+
+        return (config.finalFileURL, Int64(fileSize))
     }
 
     /// 错误中止 — 关掉 writer 并清掉残留 tmp，不写出最终文件。
