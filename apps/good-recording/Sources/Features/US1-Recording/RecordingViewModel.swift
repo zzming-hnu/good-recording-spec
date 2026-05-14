@@ -24,6 +24,9 @@ final class RecordingViewModel: ObservableObject {
     @Published private(set) var hotkeyAvailable: Bool = true
     @Published private(set) var elapsedDescription: String = "00:00"
 
+    /// US2 — range picker view model (owns the target selection state).
+    @Published var rangePicker = RangePickerViewModel()
+
     // MARK: Computed UI
 
     var primaryButtonLabel: String {
@@ -59,6 +62,8 @@ final class RecordingViewModel: ObservableObject {
     private let settings: SettingsStore
     private var elapsedTimer: Timer?
     private var startedAt: Date?
+    private var targetWatcherTask: Task<Void, Never>?
+    private var displayChangeObserver: Any?
 
     /// Test seam — set via env var GOOD_RECORDING_FAKE_PERMISSION_DENIED=1
     private var fakePermissionDenied: Bool {
@@ -76,6 +81,10 @@ final class RecordingViewModel: ObservableObject {
                 Task { @MainActor in self?.applyState(new) }
             }
         }
+
+        // US2 T061 — Restore last-used target template from settings.
+        rangePicker.restoreFromTemplate(settings.lastUsedPreset.target)
+        rangePicker.refreshDisplays()
     }
 
     // MARK: Public commands
@@ -108,6 +117,10 @@ final class RecordingViewModel: ObservableObject {
         case .recording(let started):
             startedAt = started
             startElapsedTimer()
+            // T062 — Start monitoring for target disappearance
+            if let target = rangePicker.buildTarget() {
+                startTargetWatcher(for: target)
+            }
             MenuBarStatusItem.shared.showRecording(startedAt: started)
             MenuBarStatusItem.shared.onStopClicked = { [weak self] in
                 self?.toggleRecording()
@@ -115,6 +128,7 @@ final class RecordingViewModel: ObservableObject {
             MenuBarStatusItem.shared.onShowMainWindowClicked = nil
         case .finalizing:
             stopElapsedTimer()
+            stopTargetWatcher()
         case .idle:
             savedFileURL = nil
             missingPermission = nil
@@ -224,14 +238,18 @@ final class RecordingViewModel: ObservableObject {
             return
         }
 
-        // 2. Build StartRequest from current preset + settings
+        // 2. Build StartRequest from current preset + settings.
+        //    T061 — Persist the chosen target template before starting.
+        let template = rangePicker.buildTemplate()
+        settings.updateLastUsedPreset { p in p.target = template }
         let preset = settings.lastUsedPreset
         let saveDir = settings.settings.saveDirectory(for: preset.mode)
         let id = UUID()
         let fileURL = RecordingFileNamer.makeFileURL(
             in: saveDir, at: Date(), format: preset.videoConfig.container
         )
-        let target: RecordingTarget = .fullScreen(displayID: CGMainDisplayID())
+        let target: RecordingTarget = rangePicker.buildTarget()
+            ?? .fullScreen(displayID: CGMainDisplayID())
 
         applyState(.preparing)
 
@@ -269,6 +287,76 @@ final class RecordingViewModel: ObservableObject {
             Notifier.shared.hotkeyUnavailable()
             await Logger.shared.log(.hotkeyRegisterFail, .warn, ["key": "ctrl+shift+k"])
         }
+    }
+
+    // MARK: Target watcher (T062)
+
+    /// Start monitoring for window/display disappearance during recording.
+    private func startTargetWatcher(for target: RecordingTarget) {
+        stopTargetWatcher()
+
+        switch target {
+        case .window(let snap):
+            // Poll every 500ms for window existence
+            targetWatcherTask = Task { [weak self] in
+                while !Task.isCancelled {
+                    try? await Task.sleep(nanoseconds: 500_000_000)
+                    guard !Task.isCancelled else { return }
+                    let still = self?.isWindowStillPresent(snap.windowID) ?? true
+                    if !still {
+                        await Logger.shared.log(.targetWindowLost, .warn, [
+                            "window_id": Int(snap.windowID),
+                            "window_title": snap.windowTitle
+                        ])
+                        await self?.coordinator.stopWithReason(.targetGone)
+                        return
+                    }
+                }
+            }
+
+        case .fullScreen(let displayID):
+            // Watch for display removal via notification
+            displayChangeObserver = NotificationCenter.default.addObserver(
+                forName: NSApplication.didChangeScreenParametersNotification,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                guard let self else { return }
+                if !self.isDisplayStillPresent(displayID) {
+                    Task {
+                        await Logger.shared.log(.targetWindowLost, .warn, [
+                            "display_id": Int(displayID)
+                        ])
+                        await self.coordinator.stopWithReason(.targetGone)
+                    }
+                }
+            }
+
+        case .region:
+            // Region doesn't disappear, but the display it's on might
+            break
+        }
+    }
+
+    private func stopTargetWatcher() {
+        targetWatcherTask?.cancel()
+        targetWatcherTask = nil
+        if let obs = displayChangeObserver {
+            NotificationCenter.default.removeObserver(obs)
+            displayChangeObserver = nil
+        }
+    }
+
+    private nonisolated func isWindowStillPresent(_ windowID: CGWindowID) -> Bool {
+        let list = CGWindowListCopyWindowInfo([.optionOnScreenOnly], kCGNullWindowID) as? [[String: Any]] ?? []
+        return list.contains { ($0[kCGWindowNumber as String] as? Int) == Int(windowID) }
+    }
+
+    private nonisolated func isDisplayStillPresent(_ displayID: CGDirectDisplayID) -> Bool {
+        var ids = [CGDirectDisplayID](repeating: 0, count: 16)
+        var count: UInt32 = 0
+        CGGetActiveDisplayList(16, &ids, &count)
+        return ids.prefix(Int(count)).contains(displayID)
     }
 
     // MARK: Timer

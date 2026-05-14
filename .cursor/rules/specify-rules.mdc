@@ -14,7 +14,7 @@ shell commands, and other important information, read the current plan:
 - Contracts: [specs/001-good-recording/contracts/](mdc:specs/001-good-recording/contracts)
 - Quickstart: [specs/001-good-recording/quickstart.md](mdc:specs/001-good-recording/quickstart.md)
 - Troubleshooting: [specs/001-good-recording/troubleshooting.md](mdc:specs/001-good-recording/troubleshooting.md) (11 known macOS dev environment issues with fixes)
-- Tasks: [specs/001-good-recording/tasks.md](mdc:specs/001-good-recording/tasks.md) (47/118 done — Phases 1–3 ✅)
+- Tasks: [specs/001-good-recording/tasks.md](mdc:specs/001-good-recording/tasks.md) (63/118 done — Phases 1–4 ✅)
 - Constitution: [.specify/memory/constitution.md](mdc:.specify/memory/constitution.md) (v1.0.0)
 <!-- SPECKIT END -->
 

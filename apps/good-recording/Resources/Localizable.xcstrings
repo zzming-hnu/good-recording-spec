@@ -63,6 +63,132 @@
         "en" : { "stringUnit" : { "state" : "translated", "value" : "We never send your data off this device." } },
         "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "我们不会将任何数据发送到设备之外。" } }
       }
+    },
+    "Scope.FullScreen" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Entire Screen" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "整个屏幕" } }
+      }
+    },
+    "Scope.Window" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Single Window" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "单个窗口" } }
+      }
+    },
+    "Scope.Region" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Custom Region" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "自定义区域" } }
+      }
+    },
+    "Scope.PickerLabel" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Recording Target" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "录制范围" } }
+      }
+    },
+    "Scope.FullScreen.Hint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Will record the entire main display" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "将录制主显示器的整个屏幕" } }
+      }
+    },
+    "Scope.SelectDisplay" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Display" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择显示器" } }
+      }
+    },
+    "Scope.SelectWindow" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Window…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择窗口…" } }
+      }
+    },
+    "Scope.Reselect" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reselect" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新选择" } }
+      }
+    },
+    "Scope.SelectRegion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Select Region…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "选择区域…" } }
+      }
+    },
+    "Scope.ResetRegion" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Reset Region" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重置区域" } }
+      }
+    },
+    "Scope.NoWindows" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No recordable windows" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "没有可录制的窗口" } }
+      }
+    },
+    "Scope.Rescan" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Rescan" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "重新扫描" } }
+      }
+    },
+    "Scope.SearchWindows" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Search windows…" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "搜索窗口…" } }
+      }
+    },
+    "Scope.RegionHint" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Drag to select recording area, press Esc to cancel" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "拖动选择录制区域，按 Esc 取消" } }
+      }
+    },
+    "Scope.NoSelection" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "No window selected" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "未选择窗口" } }
+      }
+    },
+    "Scope.MainDisplay" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Main Display" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "主显示器" } }
+      }
+    },
+    "Notification.TargetGone.Title" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "Auto-stopped" } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "已自动停止" } }
+      }
+    },
+    "Notification.TargetGone.Body" : {
+      "extractionState" : "manual",
+      "localizations" : {
+        "en" : { "stringUnit" : { "state" : "translated", "value" : "The recording target has disappeared. Your recording has been saved." } },
+        "zh-Hans" : { "stringUnit" : { "state" : "translated", "value" : "录制目标已消失，已保存当前录制。" } }
+      }
     }
   },
   "version" : "1.0"

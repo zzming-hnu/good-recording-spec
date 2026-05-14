@@ -175,6 +175,7 @@ public actor CaptureCoordinator {
     private func startScreenCapture(_ req: StartRequest) async throws {
         let content = try await SCShareableContent.current
         let filter: SCContentFilter
+        var regionCropRect: CGRect? = nil
         switch req.target ?? .fullScreen(displayID: CGMainDisplayID()) {
         case .fullScreen(let displayID):
             let display = content.displays.first(where: { $0.displayID == displayID })
@@ -189,15 +190,28 @@ public actor CaptureCoordinator {
             filter = SCContentFilter(desktopIndependentWindow: win)
             sourceSize = CGSize(width: win.frame.width, height: win.frame.height)
         case .region(let rect):
-            // SCK 没有"区域"，用全屏 + crop。Apple HIG 推荐这条路径。
-            let display = content.displays.first!
+            // SCK doesn't have a "region" filter; capture the display that
+            // contains the region and use sourceRect to crop.
+            let display = Self.displayContaining(rect, from: content.displays)
             filter = SCContentFilter(display: display, excludingApplications: [], exceptingWindows: [])
+            // Convert global rect to display-local coordinates for sourceRect.
+            let localRect = CGRect(
+                x: rect.origin.x - display.frame.origin.x,
+                y: rect.origin.y - display.frame.origin.y,
+                width: rect.width,
+                height: rect.height
+            )
+            regionCropRect = localRect
             sourceSize = rect.size
         }
 
         let scConfig = SCStreamConfiguration()
         scConfig.width = Int(sourceSize.width)
         scConfig.height = Int(sourceSize.height)
+        if let crop = regionCropRect {
+            scConfig.sourceRect = crop
+            scConfig.scalesToFit = true
+        }
         scConfig.minimumFrameInterval = CMTime(value: 1, timescale: 60)
         scConfig.queueDepth = 8
         scConfig.pixelFormat = kCVPixelFormatType_32BGRA
@@ -345,6 +359,23 @@ public actor CaptureCoordinator {
         state = new
         let cb = onStateChange
         cb?(new)
+    }
+
+    /// Find the SCDisplay whose frame contains (or most overlaps) the given rect.
+    private static func displayContaining(_ rect: CGRect, from displays: [SCDisplay]) -> SCDisplay {
+        var best: SCDisplay?
+        var bestArea: CGFloat = 0
+        for d in displays {
+            let intersection = d.frame.intersection(rect)
+            if !intersection.isNull {
+                let area = intersection.width * intersection.height
+                if area > bestArea {
+                    bestArea = area
+                    best = d
+                }
+            }
+        }
+        return best ?? displays.first!
     }
 
     private func isFinishedState(_ s: CaptureState) -> Bool {

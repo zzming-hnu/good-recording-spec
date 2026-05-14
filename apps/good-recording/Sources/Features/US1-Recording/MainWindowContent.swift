@@ -12,19 +12,35 @@ struct MainWindowContentView: View {
 
     @StateObject private var vm = RecordingViewModel()
 
+    @State private var showWindowPicker = false
+    @State private var showRegionPicker = false
+
+    private let windowPickerPanel = WindowPickerPanel()
+    private let regionPickerOverlay = RegionPickerOverlay()
+
     var body: some View {
         ZStack {
             VStack(spacing: 24) {
                 Spacer(minLength: 8)
 
-                // App identity (v0.1: hard-coded zh-Hans;
-                // i18n via Localizable.xcstrings is a Phase 8 Polish task)
+                // App identity
                 VStack(spacing: 4) {
-                    Text(verbatim: "Good Recording")
+                    Text("App.Title")
                         .font(.system(size: 28, weight: .semibold))
-                    Text(verbatim: "本地优先的屏幕与音频录制")
+                    Text("App.Subtitle")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
+                }
+
+                // US2 — Range picker (idle state only)
+                if !vm.primaryButtonIsRecording && !vm.primaryButtonIsBusy {
+                    RangePickerView(
+                        vm: vm.rangePicker,
+                        onShowWindowPicker: { openWindowPicker() },
+                        onShowRegionPicker: { openRegionPicker() }
+                    )
+                    .padding(.horizontal, 16)
+                    .transition(.opacity)
                 }
 
                 // Recording icon (turns red while recording)
@@ -96,6 +112,33 @@ struct MainWindowContentView: View {
                 .transition(.opacity)
             }
         }
+    }
+
+    // MARK: US2 — Picker launchers
+
+    private func openWindowPicker() {
+        let rangePicker = vm.rangePicker
+        let panel = windowPickerPanel
+        let pickerVM = WindowPickerViewModel()
+        pickerVM.onSelect = { snap in
+            rangePicker.selectWindow(snap)
+            panel.dismiss()
+        }
+        pickerVM.onCancel = {
+            panel.dismiss()
+        }
+        panel.show(vm: pickerVM)
+    }
+
+    private func openRegionPicker() {
+        let rangePicker = vm.rangePicker
+        let overlay = regionPickerOverlay
+        overlay.initialRect = rangePicker.selectedRegion
+        overlay.onRegionSelected = { rect in
+            rangePicker.selectRegion(rect)
+        }
+        overlay.onCancel = {}
+        overlay.show()
     }
 }
 

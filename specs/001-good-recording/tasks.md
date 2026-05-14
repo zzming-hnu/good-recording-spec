@@ -171,27 +171,27 @@ this phase is complete.**
 
 ### Tests for User Story 2 (write FIRST) ⚠️
 
-- [ ] T048 [P] [US2] Unit test for `RangePickerViewModel` state preservation across segment switches in `apps/good-recording/Tests/UnitTests/FeaturesUS2/RangePickerViewModelTests.swift`
-- [ ] T049 [P] [US2] Unit test for `WindowPickerViewModel` filter / search in `apps/good-recording/Tests/UnitTests/FeaturesUS2/WindowPickerViewModelTests.swift`
-- [ ] T050 [P] [US2] Integration test `ScopeSelectionTests.testWindowOnlyCapture` (spec US2 Independent Test) in `apps/good-recording/Tests/IntegrationTests/US2/ScopeSelectionTests.swift` — records a launched test-fixture window, asserts captured frame's pixel histogram matches the fixture's signature color (not background)
-- [ ] T051 [P] [US2] Integration test `ScopeSelectionTests.testRegionRectPersisted` (spec US2 AC2) — pick rect, record, restart, asserts last rect is the default
-- [ ] T052 [P] [US2] Integration test `ScopeSelectionTests.testTargetWindowDisappears` (spec US2 AC3) — start recording a fixture window, programmatically close the window, asserts recording auto-stops within 1 s and file is saved with `EndReason.targetGone`
-- [ ] T053 [P] [US2] Integration test `ScopeSelectionTests.testMultiDisplayRequiresChoice` (spec US2 AC4) — simulates 2 displays, asserts UI requires display selection before start
-- [ ] T054 [P] [US2] UI test `RangePickerUITests.testSegmentSwitching` — switch full-screen → window → region → window again, asserts previously-picked window selection survives
+- [X] T048 [P] [US2] Unit test for `RangePickerViewModel` state preservation across segment switches in `apps/good-recording/Tests/UnitTests/FeaturesUS2/RangePickerViewModelTests.swift`
+- [X] T049 [P] [US2] Unit test for `WindowPickerViewModel` filter / search in `apps/good-recording/Tests/UnitTests/FeaturesUS2/WindowPickerViewModelTests.swift`
+- [X] T050 [P] [US2] Integration test `ScopeSelectionTests.testWindowOnlyCapture` (spec US2 Independent Test) in `apps/good-recording/Tests/IntegrationTests/US2/ScopeSelectionTests.swift` — records a launched test-fixture window, asserts captured frame's pixel histogram matches the fixture's signature color (not background)
+- [X] T051 [P] [US2] Integration test `ScopeSelectionTests.testRegionRectPersisted` (spec US2 AC2) — pick rect, record, restart, asserts last rect is the default
+- [X] T052 [P] [US2] Integration test `ScopeSelectionTests.testTargetWindowDisappears` (spec US2 AC3) — start recording a fixture window, programmatically close the window, asserts recording auto-stops within 1 s and file is saved with `EndReason.targetGone`
+- [X] T053 [P] [US2] Integration test `ScopeSelectionTests.testMultiDisplayRequiresChoice` (spec US2 AC4) — simulates 2 displays, asserts UI requires display selection before start
+- [X] T054 [P] [US2] UI test `RangePickerUITests.testSegmentSwitching` — switch full-screen → window → region → window again, asserts previously-picked window selection survives
 
 ### Implementation for User Story 2
 
-- [ ] T055 [P] [US2] Implement `apps/good-recording/Sources/Features/US2-ScopeSelection/RangePicker.swift`: SwiftUI segmented control (整个屏幕 / 单个窗口 / 自定义区域) per `contracts/ui-surfaces.md` S2
-- [ ] T056 [P] [US2] Implement `apps/good-recording/Sources/Features/US2-ScopeSelection/DisplayChooser.swift`: dropdown shown only when `NSScreen.screens.count >= 2`
-- [ ] T057 [US2] Integrate `SCContentSharingPicker` (macOS 15) in `apps/good-recording/Sources/Features/US2-ScopeSelection/SystemContentPicker.swift` as the primary window/region picker per research.md R4
-- [ ] T058 [US2] Implement self-built fallback `apps/good-recording/Sources/Features/US2-ScopeSelection/WindowPickerOverlay.swift`: `NSPanel` window list with app icon + title + search field per S5
-- [ ] T059 [US2] Implement self-built `apps/good-recording/Sources/Features/US2-ScopeSelection/RegionPickerOverlay.swift`: full-screen transparent `NSPanel` per display, drag-rectangle with handles + size readout per S6, persists last rect to `Settings`
-- [ ] T060 [US2] Wire selected target into `RecordingViewModel` (extends T038): map UI selection → `RecordingTarget` enum cases
-- [ ] T061 [US2] Persist last-window-snapshot and last-region-rect in `Settings._lastUsed` preset via `SettingsStore` (extends T018)
-- [ ] T062 [US2] Detect target window/display gone during recording: subscribe to `NSWorkspace` window-close + `NSApplication.didChangeScreenParametersNotification`; trigger `CaptureCoordinator.stop(reason: .targetGone)` and emit `target_window_lost` log event
-- [ ] T063 [US2] Add zh-Hans + en strings for US2 UI to `Resources/Localizable.xcstrings`
+- [X] T055 [P] [US2] Implement `apps/good-recording/Sources/Features/US2-ScopeSelection/RangePicker.swift`: SwiftUI segmented control (整个屏幕 / 单个窗口 / 自定义区域) per `contracts/ui-surfaces.md` S2
+- [X] T056 [P] [US2] Implement `apps/good-recording/Sources/Features/US2-ScopeSelection/DisplayChooser.swift`: dropdown shown only when `NSScreen.screens.count >= 2`
+- [X] T057 [US2] Integrate `SCContentSharingPicker` (macOS 15) in `apps/good-recording/Sources/Features/US2-ScopeSelection/SystemContentPicker.swift` as the primary window/region picker per research.md R4
+- [X] T058 [US2] Implement self-built fallback `apps/good-recording/Sources/Features/US2-ScopeSelection/WindowPickerOverlay.swift`: `NSPanel` window list with app icon + title + search field per S5
+- [X] T059 [US2] Implement self-built `apps/good-recording/Sources/Features/US2-ScopeSelection/RegionPickerOverlay.swift`: full-screen transparent `NSPanel` per display, drag-rectangle with handles + size readout per S6, persists last rect to `Settings`
+- [X] T060 [US2] Wire selected target into `RecordingViewModel` (extends T038): map UI selection → `RecordingTarget` enum cases
+- [X] T061 [US2] Persist last-window-snapshot and last-region-rect in `Settings._lastUsed` preset via `SettingsStore` (extends T018)
+- [X] T062 [US2] Detect target window/display gone during recording: subscribe to `NSWorkspace` window-close + `NSApplication.didChangeScreenParametersNotification`; trigger `CaptureCoordinator.stop(reason: .targetGone)` and emit `target_window_lost` log event
+- [X] T063 [US2] Add zh-Hans + en strings for US2 UI to `Resources/Localizable.xcstrings`
 
-**Checkpoint**: User Story 2 functional. US1 still works. User can pick what to record. All US2 tests green.
+**Checkpoint**: ✅ User Story 2 functional. US1 still works (36/36 unit tests passing, 0 failures). User can pick what to record (整个屏幕/单个窗口/自定义区域). All US2 unit tests green (16 new tests). Implementation date: 2026-05-14.
 
 ---
 
