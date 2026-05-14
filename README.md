@@ -5,8 +5,8 @@
 > **本仓库 = 完整规范 (specs/) + 真实可运行的实现 (apps/good-recording/)。**
 
 [![Status](https://img.shields.io/badge/v0.1-MVP-brightgreen)](#当前状态)
-[![Tests](https://img.shields.io/badge/tests-20%2F20-brightgreen)]()
-[![Tasks](https://img.shields.io/badge/tasks-47%2F118-blue)](specs/001-good-recording/tasks.md)
+[![Tests](https://img.shields.io/badge/tests-36%2F36-brightgreen)]()
+[![Tasks](https://img.shields.io/badge/tasks-63%2F118-blue)](specs/001-good-recording/tasks.md)
 [![Constitution](https://img.shields.io/badge/constitution-v1.0.0-purple)](.specify/memory/constitution.md)
 [![macOS](https://img.shields.io/badge/macOS-15%2B-lightgrey)]()
 [![Swift](https://img.shields.io/badge/Swift-6.0-orange)]()
@@ -39,12 +39,12 @@ constitution → specify → clarify → plan → tasks → implement
 | **Phase 1** Setup (T001–T012) | ✅ | 12/12 |
 | **Phase 2** Foundational (T013–T029) | ✅ | 17/17 — 7 个 Core 模块 + 采集/编码管道 |
 | **Phase 3** US1 一键录屏 MVP (T030–T047) | ✅ | 18/18 — **可真实运行 + 录到 mp4** |
-| **Phase 4** US2 范围选择 (T048–T063) | ⏳ | 待实施 |
+| **Phase 4** US2 范围选择 (T048–T063) | ✅ | 16/16 — 全屏 / 窗口 / 自定义区域 + 多显示器 |
 | **Phase 5** US3 音频源 UI (T064–T079) | ⏳ | 待实施 |
 | **Phase 6** US4 质量与格式设置 (T080–T093) | ⏳ | 待实施 |
 | **Phase 7** US5 仅音频录制 (T094–T103) | ⏳ | 待实施 |
 | **Phase 8** Polish (T104–T118) | ⏳ | 待实施 |
-| 单元测试 | ✅ | 20/20 PASS |
+| 单元测试 | ✅ | 36/36 PASS |
 | Universal Binary 构建 + Developer ID 签名 + 公证脚本 | ✅ | 详见 [`apps/good-recording/scripts/`](apps/good-recording/scripts) |
 
 **v0.1 MVP 已可真实运行**：单一录制按钮、`⌃⇧K` 全局停止、菜单栏状态项、系统通知、本地 JSON Lines 日志、沙箱化、自签证书工作流。
@@ -101,7 +101,7 @@ home-spec/                                        # 本仓库（monorepo）
         │   ├── App/                              # @main / AppDelegate / FeatureFlags / MainWindow
         │   ├── Features/
         │   │   ├── US1-Recording/                # ✅ 一键录屏 (Phase 3)
-        │   │   ├── US2-ScopeSelection/           # ⏳ 待 Phase 4
+        │   │   ├── US2-ScopeSelection/           # ✅ 范围选择 (Phase 4)
         │   │   ├── US3-AudioSources/             # ⏳ 待 Phase 5
         │   │   ├── US4-QualitySettings/          # ⏳ 待 Phase 6
         │   │   └── US5-AudioOnlyMode/            # ⏳ 待 Phase 7
@@ -114,7 +114,7 @@ home-spec/                                        # 本仓库（monorepo）
         │       ├── Notifications/                # 系统通知 + 应用内 banner
         │       └── Logging/                      # JSON Lines 本地日志 + OSLog
         ├── Resources/                            # Info.plist / entitlements / Localizable
-        ├── Tests/                                # 20/20 通过的单元测试
+        ├── Tests/                                # 36/36 通过的单元测试
         └── scripts/
             ├── setup-xcode.sh                    # Xcode 一键收尾配置
             ├── make-local-cert.sh                # 本地自签代码签名证书
@@ -203,10 +203,8 @@ cd apps/good-recording
   - 修复 `AudioMixer` 真混音路径（mic + system → 单条 AAC 音轨，对齐 spec FR-011）
   - **Phase 5 US3** 音频源 UI（让用户在主窗口独立勾选 mic / 系统音）
 - **v0.3**
-  - **Phase 4 US2** 范围选择（窗口 / 区域 / 多显示器）
-- **v0.4**
   - **Phase 6 US4** 质量与格式设置面板（720p / 1080p / 1440p / 原生；mp4 / mov；可自定义保存目录）
-- **v0.5**
+- **v0.4**
   - **Phase 7 US5** 仅音频录制模式（输出 m4a）
 - **v1.0**
   - **Phase 8** Polish — 关于窗口 / 数据与日志面板 / 无障碍 / 性能基准 / CI 完善 / 真实分发版
@@ -221,7 +219,7 @@ cd apps/good-recording
 2. 如果是新功能 → 走 `/speckit-specify` 流程添加新 user story
 3. 如果是 bug fix → 直接 PR，commit message 引用受影响的 FR / SC 编号
 4. 如果是 dev 环境踩坑 → 在 [troubleshooting.md](specs/001-good-recording/troubleshooting.md) 加一个 Issue 段落
-5. 跑完 `xcodebuild test -only-testing:UnitTests`（应该 20/20 PASS）
+5. 跑完 `xcodebuild test -only-testing:UnitTests`（应该 36/36 PASS）
 
 ---
 
